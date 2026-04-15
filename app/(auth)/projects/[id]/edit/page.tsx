@@ -11,7 +11,7 @@ export default async function EditProjectPage({ params }: { params: { id: string
 
   const [{ data: project }, { data: users }] = await Promise.all([
     supabase.from('projects').select('*').eq('id', params.id).single(),
-    supabase.from('users').select('id, name').eq('is_active', true),
+    supabase.from('users').select('*').eq('is_active', true),
   ])
 
   if (!project) notFound()

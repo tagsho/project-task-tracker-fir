@@ -9,7 +9,7 @@ export default async function NewProjectPage() {
   const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
   if (profile?.role !== 'admin') redirect('/projects')
 
-  const { data: users } = await supabase.from('users').select('id, name').eq('is_active', true)
+  const { data: users } = await supabase.from('users').select('*').eq('is_active', true)
 
   return (
     <div className="p-6">
