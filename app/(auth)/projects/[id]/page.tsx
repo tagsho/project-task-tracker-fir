@@ -115,8 +115,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                         {task.assignee.name.charAt(0)}
                       </span>
                     )}
-                    <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[task.status])}>
-                      {overdue ? '遅延' : STATUS_LABEL[task.status]}
+                   // 修正後
+                    <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[task.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started"])}>
+                      {overdue ? '遅延' : STATUS_LABEL[task.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started"]}
                     </span>
                     <span className={clsx('badge', PRIORITY_COLOR[task.priority as keyof typeof PRIORITY_COLOR])}>
                       {PRIORITY_LABEL[task.priority as keyof typeof PRIORITY_LABEL]}
