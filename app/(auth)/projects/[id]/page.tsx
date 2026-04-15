@@ -34,7 +34,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     ? Math.round(allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length * 100)
     : 0
 
+  const status = project.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started";
   return (
+
+
     <div className="p-6">
       {/* ヘッダー */}
       <div className="flex items-start justify-between mb-6">
@@ -57,7 +60,11 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <h2 className="text-xs font-medium text-gray-700 mb-3">案件情報</h2>
           <dl className="space-y-2 text-xs">
             {[
-              ['ステータス', <span className={clsx('badge', STATUS_COLOR[project.status])}>{STATUS_LABEL[project.status]}</span>],
+               ['ステータス', (
+                <span className={clsx('badge', STATUS_COLOR[status])}>
+                  {STATUS_LABEL[status]}
+                </span>
+              )],
               ['責任者', (project.owner as any)?.name ?? '—'],
               ['開始日', project.start_date ?? '—'],
               ['終了予定', project.end_date ?? '—'],
