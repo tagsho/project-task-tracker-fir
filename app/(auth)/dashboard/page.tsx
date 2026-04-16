@@ -48,6 +48,11 @@ export default async function DashboardPage() {
     return Math.round(tasks.filter((t: any) => t.status === 'completed').length / tasks.length * 100)
   }
 
+  function getInitial(name?: string | null): string {
+    if (!name) return '?'
+    return name.charAt(0)
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -89,7 +94,7 @@ export default async function DashboardPage() {
                   <span className="flex-1 text-xs text-gray-800 truncate">{task.name}</span>
                   {task.assignee && (
                     <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-medium flex items-center justify-center shrink-0">
-                      {task.assignee.name.charAt(0)}
+                      {getInitial(task.assignee.name)}
                     </span>
                   )}
                 </div>
@@ -137,7 +142,7 @@ export default async function DashboardPage() {
             return (
               <div key={user.id} className="text-center bg-gray-50 rounded-lg p-3">
                 <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium flex items-center justify-center mx-auto mb-1.5">
-                  {user.name.charAt(0)}
+                  {getInitial(user.name)}
                 </div>
                 <p className="text-xs text-gray-600 mb-1 truncate">{user.name}</p>
                 <p className={clsx('text-xs font-medium', overdueTasks > 0 ? 'text-red-600' : 'text-green-600')}>
