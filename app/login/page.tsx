@@ -25,8 +25,10 @@ export default function LoginPage() {
       return
     }
 
-    window.location.href = '/dashboard'
-    setLoading(false)
+    // ★ 修正: window.location.href の代わりに router.refresh() + router.push() を使用
+    // signInWithPassword 後、Next.js の Router Cache をクリアしてから遷移する
+    router.refresh()
+    router.push('/dashboard')
   }
 
   return (

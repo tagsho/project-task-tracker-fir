@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
+          // ★ 修正: supabaseResponse を再生成する前に、元の request を引き継ぐ
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options ?? {})
@@ -26,6 +27,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // ★ 重要: getUser() を呼ぶことでセッションCookieのリフレッシュが行われる
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user && !request.nextUrl.pathname.startsWith('/login')) {
@@ -40,6 +42,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // ★ 修正: supabaseResponse をそのまま返すことでCookieが確実にブラウザへ送られる
   return supabaseResponse
 }
 
