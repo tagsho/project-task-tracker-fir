@@ -1,5 +1,4 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { STATUS_COLOR, STATUS_LABEL } from '@/types'
 import { format, isToday, isPast } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import clsx from 'clsx'
@@ -58,6 +57,11 @@ export default async function DashboardPage() {
     return name.charAt(0)
   }
 
+  function getAssigneeName(assignee: { name?: string | null } | { name?: string | null }[] | null): string | null {
+    if (!assignee) return null
+    return Array.isArray(assignee) ? assignee[0]?.name ?? null : assignee.name ?? null
+  }
+
   function getUserTaskStats(userId: string) {
     const tasks = userTasks?.filter(task => task.assignee_id === userId) ?? []
     return {
@@ -99,15 +103,17 @@ export default async function DashboardPage() {
           <div className="space-y-2">
             {urgentTasks?.map(task => {
               const overdue = !isToday(new Date(task.end_date))
+              const assigneeName = getAssigneeName(task.assignee)
+
               return (
                 <div key={task.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 last:border-0">
                   <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')}>
                     {overdue ? '遅延' : '本日'}
                   </span>
                   <span className="flex-1 text-xs text-gray-800 truncate">{task.name}</span>
-                  {task.assignee && (
+                  {assigneeName && (
                     <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-medium flex items-center justify-center shrink-0">
-                      {getInitial(task.assignee.name)}
+                      {getInitial(assigneeName)}
                     </span>
                   )}
                 </div>
