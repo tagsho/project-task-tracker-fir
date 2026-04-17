@@ -1,10 +1,16 @@
-import { createServerClient, type CookieOptionsWithName } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+
+type CookieToSet = {
+  name: string
+  value: string
+  options?: Record<string, unknown>
+}
 
 export async function GET(request: NextRequest) {
   const cookieNames = request.cookies.getAll().map(cookie => cookie.name)
   const supabaseCookieNames = cookieNames.filter(name => name.startsWith('sb-'))
-  let cookiesToSet: CookieOptionsWithName[] = []
+  let cookiesToSet: CookieToSet[] = []
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +21,7 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(newCookies) {
-          cookiesToSet = newCookies
+          cookiesToSet = newCookies as CookieToSet[]
         },
       },
     }
@@ -35,7 +41,7 @@ export async function GET(request: NextRequest) {
     authError: error?.message ?? null,
   })
 
-  cookiesToSet.forEach(({ name, value, ...options }) => {
+  cookiesToSet.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options)
   })
 
