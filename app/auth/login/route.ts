@@ -2,13 +2,15 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json().catch(() => ({ email: '', password: '' }))
+  const formData = await request.formData()
+  const email = String(formData.get('email') ?? '')
+  const password = String(formData.get('password') ?? '')
 
   if (!email || !password) {
-    return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+    return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
   }
 
-  const response = NextResponse.json({ ok: true })
+  const response = NextResponse.redirect(new URL('/dashboard', request.url), { status: 303 })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return NextResponse.json({ error: 'Invalid login credentials' }, { status: 401 })
+    return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
   }
 
   return response
