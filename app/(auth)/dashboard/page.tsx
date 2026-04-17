@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { STATUS_COLOR, STATUS_LABEL, PRIORITY_COLOR, PRIORITY_LABEL } from '@/types'
+import { STATUS_COLOR, STATUS_LABEL } from '@/types'
 import { format, isToday, isPast } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import clsx from 'clsx'
@@ -9,18 +9,18 @@ export default async function DashboardPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  // 並列でデータ取得
   const [
     { count: inProgressCount },
     { data: urgentTasks },
     { data: projects },
     { data: users },
+    { data: userTasks },
   ] = await Promise.all([
-    supabase.from('projects').select('*', { count: 'exact', head: true })
+    supabase.from('projects').select('id', { count: 'exact', head: true })
       .eq('status', 'in_progress').is('deleted_at', null),
 
     supabase.from('tasks')
-      .select('*, assignee:users(name), phase:phases(name, project:projects(name))')
+      .select('id, name, end_date, assignee:users(name)')
       .is('deleted_at', null)
       .neq('status', 'completed')
       .lte('end_date', today)
@@ -28,15 +28,20 @@ export default async function DashboardPage() {
       .limit(10),
 
     supabase.from('projects')
-      .select('*, owner:users(name), phases(tasks(status))')
+      .select('id, name, phases(tasks(status))')
       .eq('status', 'in_progress')
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .limit(8),
 
     supabase.from('users')
-      .select('*, tasks(status, end_date, deleted_at)')
+      .select('id, name')
       .eq('is_active', true),
+
+    supabase.from('tasks')
+      .select('assignee_id, status, end_date')
+      .is('deleted_at', null)
+      .not('assignee_id', 'is', null),
   ])
 
   const dueTodayCount = urgentTasks?.filter(t => isToday(new Date(t.end_date))).length ?? 0
@@ -53,6 +58,16 @@ export default async function DashboardPage() {
     return name.charAt(0)
   }
 
+  function getUserTaskStats(userId: string) {
+    const tasks = userTasks?.filter(task => task.assignee_id === userId) ?? []
+    return {
+      totalTasks: tasks.length,
+      overdueTasks: tasks.filter(task =>
+        task.end_date && isPast(new Date(task.end_date)) && task.status !== 'completed'
+      ).length,
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -60,7 +75,6 @@ export default async function DashboardPage() {
         <p className="text-xs text-gray-400">{format(new Date(), 'yyyy年M月d日（E）', { locale: ja })}</p>
       </div>
 
-      {/* サマリー */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">進行中の案件</p>
@@ -77,7 +91,6 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
-        {/* 遅延・期限タスク */}
         <div className="card">
           <h2 className="text-xs font-medium text-gray-700 mb-3">遅延・本日期限タスク</h2>
           {urgentTasks?.length === 0 && (
@@ -103,7 +116,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* 案件進捗 */}
         <div className="card">
           <h2 className="text-xs font-medium text-gray-700 mb-3">案件進捗</h2>
           <div className="space-y-3">
@@ -128,16 +140,11 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* 担当者別タスク状況 */}
       <div className="card">
         <h2 className="text-xs font-medium text-gray-700 mb-3">担当者別タスク状況</h2>
         <div className="grid grid-cols-4 gap-3">
           {users?.map(user => {
-            const activeTasks = user.tasks?.filter((t: any) => !t.deleted_at) ?? []
-            const totalTasks = activeTasks.length
-            const overdueTasks = activeTasks.filter((t: any) =>
-              t.end_date && isPast(new Date(t.end_date)) && t.status !== 'completed'
-            ).length
+            const { totalTasks, overdueTasks } = getUserTaskStats(user.id)
             if (totalTasks === 0) return null
             return (
               <div key={user.id} className="text-center bg-gray-50 rounded-lg p-3">
