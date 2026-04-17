@@ -21,7 +21,7 @@ export default async function GanttPage({ searchParams }: { searchParams: { proj
   if (selectedId) {
     const { data: phases } = await supabase
       .from('phases')
-      .select('*, tasks(*, assignee:users(name))')
+      .select('name, tasks(id, name, start_date, end_date, progress, status, assignee:users(name))')
       .eq('project_id', selectedId)
       .is('deleted_at', null)
       .order('sort_order')
