@@ -5,6 +5,8 @@ import Link from 'next/link'
 import clsx from 'clsx'
 import TaskProgressForm from '@/components/TaskProgressForm'
 import CommentSection from '@/components/CommentSection'
+import DeleteProjectButton from '@/components/DeleteProjectButton'
+import { deleteProject } from '../actions'
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
@@ -28,6 +30,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
   const isAdmin = profile?.role === 'admin'
+  const deleteAction = deleteProject.bind(null, Number(project.id))
 
   const allTasks = (project.phases ?? []).flatMap((p: any) => p.tasks ?? [])
   const autoProgress = allTasks.length
@@ -48,7 +51,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <h1 className="text-base font-semibold">{project.name}</h1>
         </div>
         {isAdmin && (
-          <Link href={`/projects/${project.id}/edit`} className="btn">編集</Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/projects/${project.id}/edit`} className="btn">編集</Link>
+            <DeleteProjectButton action={deleteAction} />
+          </div>
         )}
       </div>
 
