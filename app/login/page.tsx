@@ -1,10 +1,9 @@
-'use client'
-
-import { useSearchParams } from 'next/navigation'
-
-export default function LoginPage() {
-  const searchParams = useSearchParams()
-  const hasError = searchParams.get('error') === 'invalid'
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { error?: string }
+}) {
+  const hasError = searchParams?.error === 'invalid'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
