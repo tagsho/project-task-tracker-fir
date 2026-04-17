@@ -46,21 +46,19 @@ export default async function GanttPage({ searchParams }: { searchParams: { proj
     <div className="p-6">
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-base font-semibold">ガントチャート</h1>
-        <form>
+        <form action="/gantt" className="flex items-center gap-2">
           <select
             name="project_id"
             defaultValue={selectedId}
-            onChange={e => {
-              const url = new URL(window.location.href)
-              url.searchParams.set('project_id', e.target.value)
-              window.location.href = url.toString()
-            }}
             className="input w-64 text-xs"
           >
             {projects?.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          <button type="submit" className="btn text-xs">
+            表示
+          </button>
         </form>
       </div>
 
