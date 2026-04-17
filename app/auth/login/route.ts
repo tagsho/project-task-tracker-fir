@@ -1,7 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function isSameOriginRequest(request: NextRequest) {
+  const requestOrigin = new URL(request.url).origin
+  const origin = request.headers.get('origin')
+  const referer = request.headers.get('referer')
+
+  if (origin && origin !== requestOrigin) return false
+  if (!referer) return true
+
+  try {
+    return new URL(referer).origin === requestOrigin
+  } catch {
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const formData = await request.formData()
   const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
