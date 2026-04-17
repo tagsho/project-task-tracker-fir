@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const router = useRouter()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,10 +23,8 @@ export default function LoginPage() {
       return
     }
 
-    // ★ 修正: window.location.href の代わりに router.refresh() + router.push() を使用
-    // signInWithPassword 後、Next.js の Router Cache をクリアしてから遷移する
-    router.refresh()
-    router.push('/dashboard')
+    // フルページリロードでmiddlewareに新しいセッションCookieを確実に読ませる
+    window.location.replace('/dashboard')
   }
 
   return (
@@ -38,7 +34,6 @@ export default function LoginPage() {
           <h1 className="text-xl font-semibold text-gray-900">工程表・スケジュール管理</h1>
           <p className="text-sm text-gray-500 mt-1">社内向けシステム</p>
         </div>
-
         <div className="card">
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
@@ -62,11 +57,9 @@ export default function LoginPage() {
                 required
               />
             </div>
-
             {error && (
               <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
-
             <button
               type="submit"
               className="btn-primary w-full justify-center"

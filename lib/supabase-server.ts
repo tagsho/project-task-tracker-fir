@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { type ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies'
 
 export function createServerSupabaseClient() {
   const cookieStore = cookies()
@@ -12,7 +11,7 @@ export function createServerSupabaseClient() {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet: { name: string; value: string; options?: ResponseCookie }[]) {
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
