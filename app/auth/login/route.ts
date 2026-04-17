@@ -1,14 +1,35 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function POST(request: NextRequest) {
-  const { email, password } = await request.json().catch(() => ({ email: '', password: '' }))
+function isSameOriginRequest(request: NextRequest) {
+  const requestOrigin = new URL(request.url).origin
+  const origin = request.headers.get('origin')
+  const referer = request.headers.get('referer')
 
-  if (!email || !password) {
-    return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+  if (origin && origin !== requestOrigin) return false
+  if (!referer) return true
+
+  try {
+    return new URL(referer).origin === requestOrigin
+  } catch {
+    return false
+  }
+}
+
+export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const response = NextResponse.json({ ok: true })
+  const formData = await request.formData()
+  const email = String(formData.get('email') ?? '')
+  const password = String(formData.get('password') ?? '')
+
+  if (!email || !password) {
+    return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
+  }
+
+  const response = NextResponse.redirect(new URL('/dashboard', request.url), { status: 303 })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,7 +50,7 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return NextResponse.json({ error: 'Invalid login credentials' }, { status: 401 })
+    return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
   }
 
   return response
