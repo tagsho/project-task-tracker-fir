@@ -1,6 +1,10 @@
 'use client'
 
-export default function DeleteProjectButton({ action }: { action: () => void }) {
+type DeleteProjectButtonProps = {
+  action: () => void | Promise<void>
+}
+
+export default function DeleteProjectButton({ action }: DeleteProjectButtonProps) {
   return (
     <form
       action={action}
@@ -10,7 +14,7 @@ export default function DeleteProjectButton({ action }: { action: () => void }) 
         }
       }}
     >
-      <button type="submit" className="btn text-red-600 hover:bg-red-50 hover:text-red-700">
+      <button type="submit" className="btn text-xs text-red-600 hover:bg-red-50 hover:text-red-700">
         削除
       </button>
     </form>
