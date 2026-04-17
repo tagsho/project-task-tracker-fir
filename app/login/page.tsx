@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -15,15 +13,18 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const response = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
 
-    if (error) {
+    if (!response.ok) {
       setError('メールアドレスまたはパスワードが正しくありません')
       setLoading(false)
       return
     }
 
-    // フルページリロードでmiddlewareに新しいセッションCookieを確実に読ませる
     window.location.replace('/dashboard')
   }
 
