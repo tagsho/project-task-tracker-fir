@@ -16,7 +16,7 @@ export default function GanttChart({ tasks, isAdmin }: { tasks: any[]; isAdmin: 
     let cancelled = false
 
     async function loadGantt() {
-      const module = await import('frappe-gantt')
+      const module = await import('frappe-gantt/dist/frappe-gantt.min.js')
       if (cancelled) return
 
       const Gantt = ((module as any).default ?? module) as GanttConstructor
