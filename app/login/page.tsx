@@ -1,32 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const response = await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-
-    if (!response.ok) {
-      setError('メールアドレスまたはパスワードが正しくありません')
-      setLoading(false)
-      return
-    }
-
-    window.location.replace('/dashboard')
-  }
+  const searchParams = useSearchParams()
+  const hasError = searchParams.get('error') === 'invalid'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -36,37 +14,35 @@ export default function LoginPage() {
           <p className="text-sm text-gray-500 mt-1">社内向けシステム</p>
         </div>
         <div className="card">
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form action="/auth/login" method="post" className="space-y-4">
             <div>
-              <label className="label">メールアドレス</label>
+              <label className="label" htmlFor="email">メールアドレス</label>
               <input
+                id="email"
+                name="email"
                 type="email"
                 className="input"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
               />
             </div>
             <div>
-              <label className="label">パスワード</label>
+              <label className="label" htmlFor="password">パスワード</label>
               <input
+                id="password"
+                name="password"
                 type="password"
                 className="input"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
                 required
               />
             </div>
-            {error && (
-              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>
+            {hasError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
+                メールアドレスまたはパスワードが正しくありません
+              </p>
             )}
-            <button
-              type="submit"
-              className="btn-primary w-full justify-center"
-              disabled={loading}
-            >
-              {loading ? 'ログイン中...' : 'ログイン'}
+            <button type="submit" className="btn-primary w-full justify-center">
+              ログイン
             </button>
           </form>
         </div>
