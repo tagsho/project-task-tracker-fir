@@ -34,12 +34,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     ? Math.round(allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length * 100)
     : 0
 
-  const status = project.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started";
+  const status = project.status as keyof typeof STATUS_COLOR
+
   return (
-
-
     <div className="p-6">
-      {/* ヘッダー */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
@@ -55,12 +53,11 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
-        {/* 案件情報 */}
         <div className="card">
           <h2 className="text-xs font-medium text-gray-700 mb-3">案件情報</h2>
           <dl className="space-y-2 text-xs">
             {[
-               ['ステータス', (
+              ['ステータス', (
                 <span className={clsx('badge', STATUS_COLOR[status])}>
                   {STATUS_LABEL[status]}
                 </span>
@@ -78,19 +75,12 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           </dl>
         </div>
 
-        {/* コメント */}
         <CommentSection entityType="project" entityId={project.id} currentUserId={user!.id} />
       </div>
 
-      {/* 工程・タスク */}
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-medium text-gray-700">工程・タスク</h2>
-          {isAdmin && (
-            <Link href={`/projects/${project.id}/phases/new`} className="btn text-xs">
-              ＋ 工程追加
-            </Link>
-          )}
         </div>
 
         <div className="space-y-3">
@@ -107,6 +97,8 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
               {phase.tasks?.map((task: any) => {
                 const overdue = task.end_date && new Date(task.end_date) < new Date() && task.status !== 'completed'
                 const isMyTask = task.assignee_id === user?.id
+                const taskStatus = task.status as keyof typeof STATUS_COLOR
+
                 return (
                   <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
                     <span className="flex-1 text-xs text-gray-800">{task.name}</span>
@@ -115,14 +107,12 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                         {task.assignee.name.charAt(0)}
                       </span>
                     )}
-                   // 修正後
-                    <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[task.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started"])}>
-                      {overdue ? '遅延' : STATUS_LABEL[task.status as "pending" | "in_progress" | "completed" | "on_hold" | "not_started"]}
+                    <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[taskStatus])}>
+                      {overdue ? '遅延' : STATUS_LABEL[taskStatus]}
                     </span>
                     <span className={clsx('badge', PRIORITY_COLOR[task.priority as keyof typeof PRIORITY_COLOR])}>
                       {PRIORITY_LABEL[task.priority as keyof typeof PRIORITY_LABEL]}
                     </span>
-                    {/* 自分の担当 or 管理者は進捗更新できる */}
                     {(isAdmin || isMyTask) && (
                       <TaskProgressForm taskId={task.id} currentProgress={task.progress} currentStatus={task.status} />
                     )}
