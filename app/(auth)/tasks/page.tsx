@@ -4,6 +4,7 @@ import { format, isPast, isToday } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import clsx from 'clsx'
+import TaskProgressForm from '@/components/TaskProgressForm'
 
 type Filter = 'active' | 'overdue' | 'completed' | 'all'
 
@@ -150,7 +151,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
               {isAdmin && <th className="text-left font-medium px-4 py-3">担当者</th>}
               <th className="text-left font-medium px-4 py-3">期限</th>
               <th className="text-left font-medium px-4 py-3">状態</th>
-              <th className="text-right font-medium px-4 py-3">進捗</th>
+              <th className="text-left font-medium px-4 py-3">進捗更新</th>
             </tr>
           </thead>
           <tbody>
@@ -187,7 +188,14 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
                       {overdue ? '遅延' : STATUS_LABEL[taskStatus]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-600">{task.progress}%</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <TaskProgressForm
+                      taskId={task.id}
+                      currentProgress={task.progress}
+                      currentStatus={task.status}
+                      showStatus
+                    />
+                  </td>
                 </tr>
               )
             })}
