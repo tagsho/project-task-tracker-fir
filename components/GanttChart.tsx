@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 
@@ -59,8 +60,11 @@ export default function GanttChart({ tasks, isAdmin }: { tasks: any[]; isAdmin: 
 
   if (tasks.length === 0) {
     return (
-      <div className="p-8 text-center text-sm text-gray-400">
-        開始日・終了日が設定されたタスクがありません
+      <div className="p-8 text-center">
+        <p className="text-sm text-gray-500 mb-3">開始日・終了日が設定されたタスクがありません</p>
+        <Link href="/projects" className="btn text-xs">
+          案件一覧へ
+        </Link>
       </div>
     )
   }
