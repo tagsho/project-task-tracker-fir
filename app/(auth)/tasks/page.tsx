@@ -31,6 +31,10 @@ function getPhase(task: any) {
   return relationOne<any>(task.phase)
 }
 
+function kpiColor(count: number, activeColor: string) {
+  return count > 0 ? activeColor : 'text-gray-500'
+}
+
 export default async function TasksPage({ searchParams }: { searchParams: { filter?: Filter } }) {
   const supabase = createServerSupabaseClient()
   const filter = searchParams.filter ?? 'active'
@@ -111,19 +115,19 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
       <div className="grid grid-cols-4 gap-3 mb-4">
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">未完了</p>
-          <p className="text-2xl font-semibold text-blue-600">{activeCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(activeCount, 'text-blue-600'))}>{activeCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">本日期限</p>
-          <p className="text-2xl font-semibold text-yellow-600">{dueTodayCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(dueTodayCount, 'text-yellow-600'))}>{dueTodayCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">遅延</p>
-          <p className="text-2xl font-semibold text-red-600">{overdueCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(overdueCount, 'text-red-600'))}>{overdueCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">完了</p>
-          <p className="text-2xl font-semibold text-green-600">{completedCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(completedCount, 'text-green-600'))}>{completedCount}</p>
         </div>
       </div>
 
@@ -202,7 +206,12 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
           </tbody>
         </table>
         {!visibleTasks.length && (
-          <p className="px-4 py-6 text-xs text-gray-400">表示するタスクはありません</p>
+          <div className="px-4 py-8 text-center">
+            <p className="text-xs text-gray-400 mb-3">表示するタスクはありません</p>
+            <Link href="/projects" className="btn text-xs">
+              案件一覧へ
+            </Link>
+          </div>
         )}
       </div>
     </div>
