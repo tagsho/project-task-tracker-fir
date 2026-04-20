@@ -17,9 +17,10 @@ export default async function ProjectsPage() {
   const [{ data: projects }, { data: { user } }] = await Promise.all([
     supabase
       .from('projects')
-      .select('*, owner:users(name), phases(tasks(status))')
+      .select('id, name, status, start_date, end_date, owner:users(name), phases(tasks(status))')
       .is('deleted_at', null)
-      .order('updated_at', { ascending: false }),
+      .order('updated_at', { ascending: false })
+      .limit(50),
     supabase.auth.getUser(),
   ])
 
