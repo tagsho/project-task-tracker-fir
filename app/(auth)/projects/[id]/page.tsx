@@ -7,8 +7,10 @@ import TaskProgressForm from '@/components/TaskProgressForm'
 import CommentSection from '@/components/CommentSection'
 import DeleteProjectButton from '@/components/DeleteProjectButton'
 import DeletePhaseButton from '@/components/DeletePhaseButton'
+import DeleteTaskButton from '@/components/DeleteTaskButton'
 import { deleteProject } from '../actions'
 import { deletePhase } from './phases/actions'
+import { deleteTask } from './phases/[phaseId]/tasks/actions'
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
@@ -38,7 +40,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     .filter((phase: any) => !phase.deleted_at)
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
-  const allTasks = phases.flatMap((p: any) => p.tasks ?? [])
+  const allTasks = phases.flatMap((p: any) => (p.tasks ?? []).filter((task: any) => !task.deleted_at))
   const autoProgress = allTasks.length
     ? Math.round(allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length * 100)
     : 0
@@ -103,6 +105,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
         <div className="space-y-3">
           {phases.map((phase: any) => {
             const phaseDeleteAction = deletePhase.bind(null, Number(project.id), Number(phase.id))
+            const tasks = ((phase.tasks as any[]) ?? []).filter((task: any) => !task.deleted_at)
 
             return (
               <div key={phase.id} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -115,6 +118,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                   <span className="ml-auto text-xs text-gray-400">{phase.progress}%</span>
                   {isAdmin && (
                     <div className="flex items-center gap-2 ml-2">
+                      <Link href={`/projects/${project.id}/phases/${phase.id}/tasks/new`} className="btn text-xs">
+                        タスク追加
+                      </Link>
                       <Link href={`/projects/${project.id}/phases/${phase.id}/edit`} className="btn text-xs">
                         編集
                       </Link>
@@ -123,10 +129,11 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                   )}
                 </div>
 
-                {phase.tasks?.map((task: any) => {
+                {tasks.map((task: any) => {
                   const overdue = task.end_date && new Date(task.end_date) < new Date() && task.status !== 'completed'
                   const isMyTask = task.assignee_id === user?.id
                   const taskStatus = task.status as keyof typeof STATUS_COLOR
+                  const taskDeleteAction = deleteTask.bind(null, Number(project.id), Number(phase.id), Number(task.id))
 
                   return (
                     <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
@@ -144,6 +151,14 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                       </span>
                       {(isAdmin || isMyTask) && (
                         <TaskProgressForm taskId={task.id} currentProgress={task.progress} currentStatus={task.status} />
+                      )}
+                      {isAdmin && (
+                        <div className="flex items-center gap-2">
+                          <Link href={`/projects/${project.id}/phases/${phase.id}/tasks/${task.id}/edit`} className="text-xs text-indigo-600 hover:underline">
+                            編集
+                          </Link>
+                          <DeleteTaskButton action={taskDeleteAction} />
+                        </div>
                       )}
                     </div>
                   )
