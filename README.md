@@ -19,6 +19,14 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
+## Supabaseメンテナンス
+
+重くなりやすい一覧・ダッシュボード系のクエリ向けに、以下のindex追加SQLを用意しています。
+
+- `supabase/migrations/20260421_add_performance_indexes.sql`
+
+Supabase SQL Editorで実行するか、運用中のmigrationフローに組み込んで適用してください。
+
 ## Vercelデプロイ
 
 ```bash
