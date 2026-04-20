@@ -21,6 +21,7 @@ export default async function DashboardPage() {
     supabase.from('tasks')
       .select('id, name, end_date, assignee:users(name)')
       .is('deleted_at', null)
+      .not('end_date', 'is', null)
       .neq('status', 'completed')
       .lte('end_date', today)
       .order('end_date')
@@ -35,12 +36,15 @@ export default async function DashboardPage() {
 
     supabase.from('users')
       .select('id, name')
-      .eq('is_active', true),
+      .eq('is_active', true)
+      .limit(40),
 
     supabase.from('tasks')
       .select('assignee_id, status, end_date')
       .is('deleted_at', null)
-      .not('assignee_id', 'is', null),
+      .neq('status', 'completed')
+      .not('assignee_id', 'is', null)
+      .limit(500),
   ])
 
   const dueTodayCount = urgentTasks?.filter(t => isToday(new Date(t.end_date))).length ?? 0
@@ -161,7 +165,7 @@ export default async function DashboardPage() {
                 <p className={clsx('text-xs font-medium', overdueTasks > 0 ? 'text-red-600' : 'text-green-600')}>
                   遅延 {overdueTasks}
                 </p>
-                <p className="text-xs text-gray-400">担当 {totalTasks}</p>
+                <p className="text-xs text-gray-400">未完了 {totalTasks}</p>
               </div>
             )
           })}
