@@ -4,6 +4,7 @@ import { format, isPast, isToday } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import clsx from 'clsx'
+import TaskProgressForm from '@/components/TaskProgressForm'
 
 type Filter = 'active' | 'overdue' | 'completed' | 'all'
 
@@ -28,6 +29,10 @@ function getProject(task: any) {
 
 function getPhase(task: any) {
   return relationOne<any>(task.phase)
+}
+
+function kpiColor(count: number, activeColor: string) {
+  return count > 0 ? activeColor : 'text-gray-500'
 }
 
 export default async function TasksPage({ searchParams }: { searchParams: { filter?: Filter } }) {
@@ -110,19 +115,19 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
       <div className="grid grid-cols-4 gap-3 mb-4">
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">未完了</p>
-          <p className="text-2xl font-semibold text-blue-600">{activeCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(activeCount, 'text-blue-600'))}>{activeCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">本日期限</p>
-          <p className="text-2xl font-semibold text-yellow-600">{dueTodayCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(dueTodayCount, 'text-yellow-600'))}>{dueTodayCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">遅延</p>
-          <p className="text-2xl font-semibold text-red-600">{overdueCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(overdueCount, 'text-red-600'))}>{overdueCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">完了</p>
-          <p className="text-2xl font-semibold text-green-600">{completedCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(completedCount, 'text-green-600'))}>{completedCount}</p>
         </div>
       </div>
 
@@ -150,7 +155,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
               {isAdmin && <th className="text-left font-medium px-4 py-3">担当者</th>}
               <th className="text-left font-medium px-4 py-3">期限</th>
               <th className="text-left font-medium px-4 py-3">状態</th>
-              <th className="text-right font-medium px-4 py-3">進捗</th>
+              <th className="text-left font-medium px-4 py-3">進捗更新</th>
             </tr>
           </thead>
           <tbody>
@@ -187,14 +192,26 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
                       {overdue ? '遅延' : STATUS_LABEL[taskStatus]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-600">{task.progress}%</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <TaskProgressForm
+                      taskId={task.id}
+                      currentProgress={task.progress}
+                      currentStatus={task.status}
+                      showStatus
+                    />
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
         {!visibleTasks.length && (
-          <p className="px-4 py-6 text-xs text-gray-400">表示するタスクはありません</p>
+          <div className="px-4 py-8 text-center">
+            <p className="text-xs text-gray-400 mb-3">表示するタスクはありません</p>
+            <Link href="/projects" className="btn text-xs">
+              案件一覧へ
+            </Link>
+          </div>
         )}
       </div>
     </div>

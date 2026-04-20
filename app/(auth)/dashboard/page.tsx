@@ -3,6 +3,10 @@ import { format, isToday, isPast } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import clsx from 'clsx'
 
+function kpiColor(count: number, activeColor: string) {
+  return count > 0 ? activeColor : 'text-gray-500'
+}
+
 export default async function DashboardPage() {
   const supabase = createServerSupabaseClient()
 
@@ -21,6 +25,7 @@ export default async function DashboardPage() {
     supabase.from('tasks')
       .select('id, name, end_date, assignee:users(name)')
       .is('deleted_at', null)
+      .not('end_date', 'is', null)
       .neq('status', 'completed')
       .lte('end_date', today)
       .order('end_date')
@@ -35,16 +40,20 @@ export default async function DashboardPage() {
 
     supabase.from('users')
       .select('id, name')
-      .eq('is_active', true),
+      .eq('is_active', true)
+      .limit(40),
 
     supabase.from('tasks')
       .select('assignee_id, status, end_date')
       .is('deleted_at', null)
-      .not('assignee_id', 'is', null),
+      .neq('status', 'completed')
+      .not('assignee_id', 'is', null)
+      .limit(500),
   ])
 
   const dueTodayCount = urgentTasks?.filter(t => isToday(new Date(t.end_date))).length ?? 0
   const overdueCount = urgentTasks?.filter(t => !isToday(new Date(t.end_date))).length ?? 0
+  const activeProjectCount = inProgressCount ?? 0
 
   function autoProgress(phases: any[]): number {
     const tasks = phases?.flatMap((p: any) => p.tasks ?? []) ?? []
@@ -82,15 +91,15 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">進行中の案件</p>
-          <p className="text-2xl font-semibold text-indigo-600">{inProgressCount ?? 0}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(activeProjectCount, 'text-indigo-600'))}>{activeProjectCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">本日期限のタスク</p>
-          <p className="text-2xl font-semibold text-yellow-600">{dueTodayCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(dueTodayCount, 'text-yellow-600'))}>{dueTodayCount}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">遅延タスク</p>
-          <p className="text-2xl font-semibold text-red-600">{overdueCount}</p>
+          <p className={clsx('text-2xl font-semibold', kpiColor(overdueCount, 'text-red-600'))}>{overdueCount}</p>
         </div>
       </div>
 
@@ -158,10 +167,10 @@ export default async function DashboardPage() {
                   {getInitial(user.name)}
                 </div>
                 <p className="text-xs text-gray-600 mb-1 truncate">{user.name}</p>
-                <p className={clsx('text-xs font-medium', overdueTasks > 0 ? 'text-red-600' : 'text-green-600')}>
+                <p className={clsx('text-xs font-medium', overdueTasks > 0 ? 'text-red-600' : 'text-gray-500')}>
                   遅延 {overdueTasks}
                 </p>
-                <p className="text-xs text-gray-400">担当 {totalTasks}</p>
+                <p className="text-xs text-gray-400">未完了 {totalTasks}</p>
               </div>
             )
           })}
