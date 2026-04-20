@@ -4,6 +4,13 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
+let supabaseClient: ReturnType<typeof createClient> | null = null
+
+function getSupabaseClient() {
+  supabaseClient ??= createClient()
+  return supabaseClient
+}
+
 export default function TaskProgressForm({
   taskId,
   currentProgress,
@@ -19,11 +26,10 @@ export default function TaskProgressForm({
   const [status, setStatus] = useState(currentStatus)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleSave() {
     setSaving(true)
-    await supabase
+    await getSupabaseClient()
       .from('tasks')
       .update({ progress, status, updated_at: new Date().toISOString() })
       .eq('id', taskId)
