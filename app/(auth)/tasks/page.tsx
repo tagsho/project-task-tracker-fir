@@ -74,7 +74,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
   const tasks = (data ?? []).filter((task: any) => {
     const phase = getPhase(task)
     const project = getProject(task)
-    return !phase?.deleted_at && !project?.deleted_at
+    return !!phase && !!project && !phase.deleted_at && !project.deleted_at
   })
 
   const visibleTasks = tasks.filter((task: any) => {
