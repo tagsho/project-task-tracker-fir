@@ -1,35 +1,37 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 
-declare const Gantt: any
+type GanttConstructor = new (svg: SVGElement | null, tasks: any[], options: Record<string, unknown>) => any
 
 export default function GanttChart({ tasks, isAdmin }: { tasks: any[]; isAdmin: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const ganttRef = useRef<any>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     if (!containerRef.current || tasks.length === 0) return
 
-    // Frappe GanttはCDN経由でロード
-    const script = document.createElement('script')
-    script.src = 'https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js'
-    script.onload = () => initGantt()
-    document.head.appendChild(script)
+    let cancelled = false
 
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css'
-    document.head.appendChild(link)
+    async function loadGantt() {
+      const module = await import('frappe-gantt/dist/frappe-gantt.min.js')
+      if (cancelled) return
+
+      const Gantt = ((module as any).default ?? module) as GanttConstructor
+      initGantt(Gantt)
+    }
+
+    loadGantt()
 
     return () => {
-      document.head.removeChild(script)
+      cancelled = true
+      if (containerRef.current) containerRef.current.innerHTML = ''
     }
-  }, [tasks])
+  }, [tasks, isAdmin, supabase])
 
-  function initGantt() {
+  function initGantt(Gantt: GanttConstructor) {
     if (!containerRef.current) return
 
     containerRef.current.innerHTML = '<svg></svg>'
@@ -65,7 +67,6 @@ export default function GanttChart({ tasks, isAdmin }: { tasks: any[]; isAdmin: 
 
   return (
     <div>
-      {/* 表示切替 */}
       <div className="flex gap-1 p-3 border-b border-gray-200">
         {(['Day', 'Week', 'Month'] as const).map(mode => (
           <button

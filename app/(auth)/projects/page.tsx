@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { STATUS_COLOR, STATUS_LABEL } from '@/types'
 import Link from 'next/link'
 import clsx from 'clsx'
+import DeleteProjectButton from '@/components/DeleteProjectButton'
+import { deleteProject } from './actions'
 
 function autoProgress(phases: any[]): number {
   const tasks = phases?.flatMap((phase: any) => phase.tasks ?? []) ?? []
@@ -48,12 +50,14 @@ export default async function ProjectsPage() {
               <th className="text-left font-medium px-4 py-3">責任者</th>
               <th className="text-left font-medium px-4 py-3">期間</th>
               <th className="text-right font-medium px-4 py-3">進捗</th>
+              {isAdmin && <th className="text-right font-medium px-4 py-3">操作</th>}
             </tr>
           </thead>
           <tbody>
             {projects?.map((project: any) => {
               const progress = autoProgress(project.phases ?? [])
               const status = project.status as keyof typeof STATUS_COLOR
+              const deleteAction = deleteProject.bind(null, Number(project.id))
 
               return (
                 <tr key={project.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
@@ -72,6 +76,16 @@ export default async function ProjectsPage() {
                     {project.start_date ?? '—'} 〜 {project.end_date ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-600">{progress}%</td>
+                  {isAdmin && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/projects/${project.id}/edit`} className="btn text-xs">
+                          編集
+                        </Link>
+                        <DeleteProjectButton action={deleteAction} />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               )
             })}
