@@ -5,6 +5,8 @@ import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import clsx from 'clsx'
 
+const taskSelect = 'id, name, status, priority, end_date, assignee:users(name), phase:phases(name, project:projects(id, name))'
+
 export default async function SchedulePage({
   searchParams,
 }: {
@@ -18,12 +20,43 @@ export default async function SchedulePage({
   const monthEnd = endOfMonth(baseDate)
   const today = new Date().toISOString().split('T')[0]
 
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('*, assignee:users(name), phase:phases(name, project:projects(id, name))')
-    .is('deleted_at', null)
-    .not('end_date', 'is', null)
-    .order('end_date')
+  let tasks: any[] = []
+
+  if (view === 'calendar') {
+    const { data } = await supabase
+      .from('tasks')
+      .select(taskSelect)
+      .is('deleted_at', null)
+      .not('end_date', 'is', null)
+      .gte('end_date', format(monthStart, 'yyyy-MM-dd'))
+      .lte('end_date', format(monthEnd, 'yyyy-MM-dd'))
+      .order('end_date')
+      .limit(200)
+
+    tasks = data ?? []
+  } else {
+    const [{ data: overdueData }, { data: currentData }] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select(taskSelect)
+        .is('deleted_at', null)
+        .not('end_date', 'is', null)
+        .neq('status', 'completed')
+        .lt('end_date', today)
+        .order('end_date')
+        .limit(40),
+      supabase
+        .from('tasks')
+        .select(taskSelect)
+        .is('deleted_at', null)
+        .not('end_date', 'is', null)
+        .gte('end_date', today)
+        .order('end_date')
+        .limit(80),
+    ])
+
+    tasks = [...(overdueData ?? []), ...(currentData ?? [])]
+  }
 
   const prevMonth = format(new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1), 'yyyy-MM')
   const nextMonth = format(new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1), 'yyyy-MM')
