@@ -6,7 +6,9 @@ import clsx from 'clsx'
 import TaskProgressForm from '@/components/TaskProgressForm'
 import CommentSection from '@/components/CommentSection'
 import DeleteProjectButton from '@/components/DeleteProjectButton'
+import DeletePhaseButton from '@/components/DeletePhaseButton'
 import { deleteProject } from '../actions'
+import { deletePhase } from './phases/actions'
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
@@ -32,7 +34,11 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const isAdmin = profile?.role === 'admin'
   const deleteAction = deleteProject.bind(null, Number(project.id))
 
-  const allTasks = (project.phases ?? []).flatMap((p: any) => p.tasks ?? [])
+  const phases = ((project.phases as any[]) ?? [])
+    .filter((phase: any) => !phase.deleted_at)
+    .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+  const allTasks = phases.flatMap((p: any) => p.tasks ?? [])
   const autoProgress = allTasks.length
     ? Math.round(allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length * 100)
     : 0
@@ -87,46 +93,64 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-medium text-gray-700">工程・タスク</h2>
+          {isAdmin && (
+            <Link href={`/projects/${project.id}/phases/new`} className="btn text-xs">
+              ＋ 工程追加
+            </Link>
+          )}
         </div>
 
         <div className="space-y-3">
-          {(project.phases as any[])?.map((phase: any) => (
-            <div key={phase.id} className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-                <span className="text-xs font-medium text-gray-800">{phase.name}</span>
-                <span className={clsx('badge', STATUS_COLOR[phase.status as keyof typeof STATUS_COLOR])}>
-                  {STATUS_LABEL[phase.status as keyof typeof STATUS_LABEL]}
-                </span>
-                <span className="ml-auto text-xs text-gray-400">{phase.progress}%</span>
-              </div>
+          {phases.map((phase: any) => {
+            const phaseDeleteAction = deletePhase.bind(null, Number(project.id), Number(phase.id))
 
-              {phase.tasks?.map((task: any) => {
-                const overdue = task.end_date && new Date(task.end_date) < new Date() && task.status !== 'completed'
-                const isMyTask = task.assignee_id === user?.id
-                const taskStatus = task.status as keyof typeof STATUS_COLOR
+            return (
+              <div key={phase.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                  <span className="text-xs font-medium text-gray-800">{phase.name}</span>
+                  <span className={clsx('badge', STATUS_COLOR[phase.status as keyof typeof STATUS_COLOR])}>
+                    {STATUS_LABEL[phase.status as keyof typeof STATUS_LABEL]}
+                  </span>
+                  <span className="text-xs text-gray-400">{phase.start_date ?? '—'} 〜 {phase.end_date ?? '—'}</span>
+                  <span className="ml-auto text-xs text-gray-400">{phase.progress}%</span>
+                  {isAdmin && (
+                    <div className="flex items-center gap-2 ml-2">
+                      <Link href={`/projects/${project.id}/phases/${phase.id}/edit`} className="btn text-xs">
+                        編集
+                      </Link>
+                      <DeletePhaseButton action={phaseDeleteAction} />
+                    </div>
+                  )}
+                </div>
 
-                return (
-                  <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <span className="flex-1 text-xs text-gray-800">{task.name}</span>
-                    {task.assignee && (
-                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-medium flex items-center justify-center shrink-0">
-                        {task.assignee.name.charAt(0)}
+                {phase.tasks?.map((task: any) => {
+                  const overdue = task.end_date && new Date(task.end_date) < new Date() && task.status !== 'completed'
+                  const isMyTask = task.assignee_id === user?.id
+                  const taskStatus = task.status as keyof typeof STATUS_COLOR
+
+                  return (
+                    <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                      <span className="flex-1 text-xs text-gray-800">{task.name}</span>
+                      {task.assignee && (
+                        <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-medium flex items-center justify-center shrink-0">
+                          {task.assignee.name.charAt(0)}
+                        </span>
+                      )}
+                      <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[taskStatus])}>
+                        {overdue ? '遅延' : STATUS_LABEL[taskStatus]}
                       </span>
-                    )}
-                    <span className={clsx('badge', overdue ? 'bg-red-100 text-red-700' : STATUS_COLOR[taskStatus])}>
-                      {overdue ? '遅延' : STATUS_LABEL[taskStatus]}
-                    </span>
-                    <span className={clsx('badge', PRIORITY_COLOR[task.priority as keyof typeof PRIORITY_COLOR])}>
-                      {PRIORITY_LABEL[task.priority as keyof typeof PRIORITY_LABEL]}
-                    </span>
-                    {(isAdmin || isMyTask) && (
-                      <TaskProgressForm taskId={task.id} currentProgress={task.progress} currentStatus={task.status} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ))}
+                      <span className={clsx('badge', PRIORITY_COLOR[task.priority as keyof typeof PRIORITY_COLOR])}>
+                        {PRIORITY_LABEL[task.priority as keyof typeof PRIORITY_LABEL]}
+                      </span>
+                      {(isAdmin || isMyTask) && (
+                        <TaskProgressForm taskId={task.id} currentProgress={task.progress} currentStatus={task.status} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
