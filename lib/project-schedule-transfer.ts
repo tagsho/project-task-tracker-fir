@@ -139,7 +139,7 @@ export function buildScheduleExportRows(project: any): ScheduleExportRow[] {
     .filter((phase: any) => !phase.deleted_at)
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
-  return phases.flatMap((phase: any) => {
+  return phases.reduce<ScheduleExportRow[]>((rows, phase: any) => {
     const base = {
       project_id: Number(project.id),
       project_name: project.name,
@@ -156,39 +156,42 @@ export function buildScheduleExportRows(project: any): ScheduleExportRow[] {
     const tasks = ((phase.tasks as any[]) ?? []).filter((task: any) => !task.deleted_at)
 
     if (!tasks.length) {
-      return [
-        {
-          ...base,
-          task_id: null,
-          task_name: '',
-          task_status: '',
-          task_progress: '',
-          task_priority: '',
-          task_assignee_login_id: '',
-          task_assignee_name: '',
-          task_start_date: '',
-          task_end_date: '',
-          task_description: '',
-          task_note: '',
-        },
-      ]
+      rows.push({
+        ...base,
+        task_id: null,
+        task_name: '',
+        task_status: '',
+        task_progress: '',
+        task_priority: '',
+        task_assignee_login_id: '',
+        task_assignee_name: '',
+        task_start_date: '',
+        task_end_date: '',
+        task_description: '',
+        task_note: '',
+      })
+      return rows
     }
 
-    return tasks.map((task: any) => ({
-      ...base,
-      task_id: Number(task.id),
-      task_name: task.name,
-      task_status: task.status as TaskStatus,
-      task_progress: Number(task.progress ?? 0),
-      task_priority: task.priority as Priority,
-      task_assignee_login_id: textValue(task.assignee?.login_id),
-      task_assignee_name: textValue(task.assignee?.name),
-      task_start_date: normalizeDate(task.start_date),
-      task_end_date: normalizeDate(task.end_date),
-      task_description: textValue(task.description),
-      task_note: textValue(task.note),
-    }))
-  })
+    for (const task of tasks) {
+      rows.push({
+        ...base,
+        task_id: Number(task.id),
+        task_name: task.name,
+        task_status: task.status as TaskStatus,
+        task_progress: Number(task.progress ?? 0),
+        task_priority: task.priority as Priority,
+        task_assignee_login_id: textValue(task.assignee?.login_id),
+        task_assignee_name: textValue(task.assignee?.name),
+        task_start_date: normalizeDate(task.start_date),
+        task_end_date: normalizeDate(task.end_date),
+        task_description: textValue(task.description),
+        task_note: textValue(task.note),
+      })
+    }
+
+    return rows
+  }, [])
 }
 
 export function buildScheduleCsv(rows: ScheduleExportRow[]) {
