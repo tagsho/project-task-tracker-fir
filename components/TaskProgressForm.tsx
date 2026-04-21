@@ -1,48 +1,45 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useFormStatus } from 'react-dom'
 
-let supabaseClient: ReturnType<typeof createClient> | null = null
+type TaskProgressAction = (formData: FormData) => void | Promise<void>
 
-function getSupabaseClient() {
-  supabaseClient ??= createClient()
-  return supabaseClient
+function SubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus()
+
+  return (
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      className="text-xs text-indigo-600 hover:underline disabled:opacity-40"
+    >
+      {pending ? '保存中' : '保存'}
+    </button>
+  )
 }
 
 export default function TaskProgressForm({
-  taskId,
+  action,
   currentProgress,
   currentStatus,
   showStatus = false,
 }: {
-  taskId: number
+  action: TaskProgressAction
   currentProgress: number
   currentStatus: string
   showStatus?: boolean
 }) {
   const [progress, setProgress] = useState(currentProgress)
   const [status, setStatus] = useState(currentStatus)
-  const [saving, setSaving] = useState(false)
-  const router = useRouter()
-
-  async function handleSave() {
-    setSaving(true)
-    await getSupabaseClient()
-      .from('tasks')
-      .update({ progress, status, updated_at: new Date().toISOString() })
-      .eq('id', taskId)
-    setSaving(false)
-    router.refresh()
-  }
 
   const unchanged = progress === currentProgress && status === currentStatus
 
   return (
-    <div className="flex items-center gap-1.5">
+    <form action={action} className="flex items-center gap-1.5">
       {showStatus && (
         <select
+          name="status"
           value={status}
           onChange={event => setStatus(event.target.value)}
           className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white"
@@ -53,22 +50,18 @@ export default function TaskProgressForm({
           <option value="on_hold">保留</option>
         </select>
       )}
+      {!showStatus && <input type="hidden" name="status" value={status} />}
       <input
+        name="progress"
         type="number"
         min={0}
         max={100}
         value={progress}
-        onChange={e => setProgress(Number(e.target.value))}
+        onChange={event => setProgress(Number(event.target.value))}
         className="w-12 text-xs border border-gray-200 rounded px-1.5 py-0.5 text-center"
       />
       <span className="text-xs text-gray-400">%</span>
-      <button
-        onClick={handleSave}
-        disabled={saving || unchanged}
-        className="text-xs text-indigo-600 hover:underline disabled:opacity-40"
-      >
-        {saving ? '保存中' : '保存'}
-      </button>
-    </div>
+      <SubmitButton disabled={unchanged} />
+    </form>
   )
 }

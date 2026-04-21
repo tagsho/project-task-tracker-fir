@@ -11,6 +11,7 @@ import DeleteTaskButton from '@/components/DeleteTaskButton'
 import { deleteProject } from '../actions'
 import { deletePhase } from './phases/actions'
 import { deleteTask } from './phases/[phaseId]/tasks/actions'
+import { updateTaskListItem } from '../../tasks/actions'
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
@@ -31,7 +32,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
 
   if (!project) notFound()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
   const isAdmin = profile?.role === 'admin'
   const deleteAction = deleteProject.bind(null, Number(project.id))
@@ -42,7 +45,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
 
   const allTasks = phases.flatMap((p: any) => (p.tasks ?? []).filter((task: any) => !task.deleted_at))
   const autoProgress = allTasks.length
-    ? Math.round(allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length * 100)
+    ? Math.round((allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length) * 100)
     : 0
 
   const status = project.status as keyof typeof STATUS_COLOR
@@ -52,7 +55,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-            <Link href="/projects" className="hover:text-gray-600">案件一覧</Link>
+            <Link href="/projects" className="hover:text-gray-600">
+              案件一覧
+            </Link>
             <span>›</span>
             <span className="text-gray-600">{project.name}</span>
           </div>
@@ -60,7 +65,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
-            <Link href={`/projects/${project.id}/edit`} className="btn">編集</Link>
+            <Link href={`/projects/${project.id}/edit`} className="btn">
+              編集
+            </Link>
             <DeleteProjectButton action={deleteAction} />
           </div>
         )}
@@ -71,11 +78,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           <h2 className="text-xs font-medium text-gray-700 mb-3">案件情報</h2>
           <dl className="space-y-2 text-xs">
             {[
-              ['ステータス', (
-                <span className={clsx('badge', STATUS_COLOR[status])}>
-                  {STATUS_LABEL[status]}
-                </span>
-              )],
+              [
+                'ステータス',
+                <span className={clsx('badge', STATUS_COLOR[status])}>{STATUS_LABEL[status]}</span>,
+              ],
               ['責任者', (project.owner as any)?.name ?? '—'],
               ['開始日', project.start_date ?? '—'],
               ['終了予定', project.end_date ?? '—'],
@@ -114,7 +120,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                   <span className={clsx('badge', STATUS_COLOR[phase.status as keyof typeof STATUS_COLOR])}>
                     {STATUS_LABEL[phase.status as keyof typeof STATUS_LABEL]}
                   </span>
-                  <span className="text-xs text-gray-400">{phase.start_date ?? '—'} 〜 {phase.end_date ?? '—'}</span>
+                  <span className="text-xs text-gray-400">
+                    {phase.start_date ?? '—'} 〜 {phase.end_date ?? '—'}
+                  </span>
                   <span className="ml-auto text-xs text-gray-400">{phase.progress}%</span>
                   {isAdmin && (
                     <div className="flex items-center gap-2 ml-2">
@@ -134,9 +142,13 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                   const isMyTask = task.assignee_id === user?.id
                   const taskStatus = task.status as keyof typeof STATUS_COLOR
                   const taskDeleteAction = deleteTask.bind(null, Number(project.id), Number(phase.id), Number(task.id))
+                  const taskProgressAction = updateTaskListItem.bind(null, Number(task.id))
 
                   return (
-                    <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                    >
                       <span className="flex-1 text-xs text-gray-800">{task.name}</span>
                       {task.assignee && (
                         <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-medium flex items-center justify-center shrink-0">
@@ -150,11 +162,18 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                         {PRIORITY_LABEL[task.priority as keyof typeof PRIORITY_LABEL]}
                       </span>
                       {(isAdmin || isMyTask) && (
-                        <TaskProgressForm taskId={task.id} currentProgress={task.progress} currentStatus={task.status} />
+                        <TaskProgressForm
+                          action={taskProgressAction}
+                          currentProgress={task.progress}
+                          currentStatus={task.status}
+                        />
                       )}
                       {isAdmin && (
                         <div className="flex items-center gap-2">
-                          <Link href={`/projects/${project.id}/phases/${phase.id}/tasks/${task.id}/edit`} className="text-xs text-indigo-600 hover:underline">
+                          <Link
+                            href={`/projects/${project.id}/phases/${phase.id}/tasks/${task.id}/edit`}
+                            className="text-xs text-indigo-600 hover:underline"
+                          >
                             編集
                           </Link>
                           <DeleteTaskButton action={taskDeleteAction} />

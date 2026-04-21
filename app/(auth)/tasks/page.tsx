@@ -5,6 +5,7 @@ import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import clsx from 'clsx'
 import TaskProgressForm from '@/components/TaskProgressForm'
+import { updateTaskListItem } from './actions'
 
 type Filter = 'active' | 'overdue' | 'completed' | 'all'
 
@@ -166,6 +167,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
               const taskStatus = task.status as keyof typeof STATUS_COLOR
               const priority = task.priority as keyof typeof PRIORITY_COLOR
               const overdue = isOverdue(task)
+              const action = updateTaskListItem.bind(null, task.id)
 
               return (
                 <tr key={task.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
@@ -194,7 +196,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     <TaskProgressForm
-                      taskId={task.id}
+                      action={action}
                       currentProgress={task.progress}
                       currentStatus={task.status}
                       showStatus
