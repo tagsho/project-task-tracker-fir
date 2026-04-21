@@ -8,6 +8,7 @@ import CommentSection from '@/components/CommentSection'
 import DeleteProjectButton from '@/components/DeleteProjectButton'
 import DeletePhaseButton from '@/components/DeletePhaseButton'
 import DeleteTaskButton from '@/components/DeleteTaskButton'
+import ScheduleImportForm from '@/components/ScheduleImportForm'
 import { deleteProject } from '../actions'
 import { deletePhase } from './phases/actions'
 import { deleteTask } from './phases/[phaseId]/tasks/actions'
@@ -99,13 +100,27 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       </div>
 
       <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-gray-700">工程・タスク</h2>
-          {isAdmin && (
-            <Link href={`/projects/${project.id}/phases/new`} className="btn text-xs">
-              ＋ 工程追加
-            </Link>
-          )}
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-xs font-medium text-gray-700">工程・タスク</h2>
+            <p className="text-xs text-gray-400 mt-1">
+              CSV / Excelで書き出しできます。管理者は編集後の再取り込みにも対応しています。
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a href={`/projects/${project.id}/export/csv`} className="btn text-xs">
+              CSV出力
+            </a>
+            <a href={`/projects/${project.id}/export/xlsx`} className="btn text-xs">
+              Excel出力
+            </a>
+            {isAdmin && <ScheduleImportForm projectId={Number(project.id)} />}
+            {isAdmin && (
+              <Link href={`/projects/${project.id}/phases/new`} className="btn text-xs">
+                ＋ 工程追加
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">
