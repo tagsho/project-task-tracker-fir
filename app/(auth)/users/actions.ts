@@ -43,7 +43,7 @@ export async function createUser(formData: FormData) {
     redirectWithError('invalid-role')
   }
 
-  let supabaseAdmin
+  let supabaseAdmin: ReturnType<typeof createAdminSupabaseClient>
   try {
     supabaseAdmin = createAdminSupabaseClient()
   } catch {
