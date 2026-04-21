@@ -1,9 +1,12 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { STATUS_COLOR, STATUS_LABEL } from '@/types'
+import { STATUS_LABEL } from '@/types'
+import type { ProjectStatus } from '@/types'
 import Link from 'next/link'
 import clsx from 'clsx'
 import DeleteProjectButton from '@/components/DeleteProjectButton'
-import { deleteProject } from './actions'
+import { deleteProject, updateProjectStatus } from './actions'
+
+const PROJECT_STATUS_OPTIONS: ProjectStatus[] = ['pending', 'in_progress', 'completed', 'on_hold']
 
 function autoProgress(phases: any[]): number {
   const tasks = phases?.flatMap((phase: any) => phase.tasks ?? []) ?? []
@@ -57,8 +60,9 @@ export default async function ProjectsPage() {
           <tbody>
             {projects?.map((project: any) => {
               const progress = autoProgress(project.phases ?? [])
-              const status = project.status as keyof typeof STATUS_COLOR
+              const status = project.status as ProjectStatus
               const deleteAction = deleteProject.bind(null, Number(project.id))
+              const statusAction = updateProjectStatus.bind(null, Number(project.id))
 
               return (
                 <tr key={project.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
@@ -68,9 +72,38 @@ export default async function ProjectsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={clsx('badge', STATUS_COLOR[status])}>
-                      {STATUS_LABEL[status]}
-                    </span>
+                    {isAdmin ? (
+                      <form action={statusAction} className="flex items-center gap-2">
+                        <select
+                          name="status"
+                          defaultValue={status}
+                          className="input min-w-[120px] py-1.5 h-9"
+                          aria-label={`${project.name} のステータス`}
+                        >
+                          {PROJECT_STATUS_OPTIONS.map(option => (
+                            <option key={option} value={option}>
+                              {STATUS_LABEL[option]}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="btn text-xs whitespace-nowrap">
+                          更新
+                        </button>
+                      </form>
+                    ) : (
+                      <span className={clsx(
+                        'badge',
+                        status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : status === 'in_progress'
+                            ? 'bg-blue-100 text-blue-700'
+                            : status === 'on_hold'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-600'
+                      )}>
+                        {STATUS_LABEL[status]}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{project.owner?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">
