@@ -81,6 +81,26 @@ export async function updateProject(projectId: number, formData: FormData) {
   redirect(`/projects/${projectId}`)
 }
 
+export async function updateProjectStatus(projectId: number, formData: FormData) {
+  const supabase = await requireAdmin()
+  const status = String(formData.get('status') ?? '') as ProjectStatus
+
+  if (!PROJECT_STATUSES.includes(status)) {
+    throw new Error('ステータスが不正です')
+  }
+
+  const { error } = await supabase
+    .from('projects')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+    .is('deleted_at', null)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/projects')
+  revalidatePath(`/projects/${projectId}`)
+}
+
 export async function deleteProject(projectId: number) {
   const supabase = await requireAdmin()
 
