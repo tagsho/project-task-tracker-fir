@@ -320,13 +320,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
       : `/projects/${selectedId}/phases/new`
     : '/projects'
   const projectQuery = selectedId ? `?project_id=${selectedId}` : ''
-  const notifications: NotificationItem[] = [
+  const notificationSeed = [
     {
       id: 'overdue',
       label: '遅延タスク',
       description: '期限超過のタスクがあります',
       href: '/tasks?filter=overdue',
-      tone: 'red',
+      tone: 'red' as const,
       count: stats.overdue,
     },
     {
@@ -334,7 +334,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
       label: '本日期限',
       description: '今日が期限のタスクです',
       href: `/calendar${projectQuery}`,
-      tone: 'yellow',
+      tone: 'yellow' as const,
       count: dueTodayCount,
     },
     {
@@ -342,10 +342,11 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
       label: '直近3日',
       description: '数日以内に期限が来るタスクです',
       href: '/tasks',
-      tone: 'blue',
+      tone: 'blue' as const,
       count: soonCount,
     },
-  ].filter(item => item.count > 0)
+  ] satisfies NotificationItem[]
+  const notifications = notificationSeed.filter(item => item.count > 0)
   const notificationCount = notifications.reduce((sum, item) => sum + item.count, 0)
 
   return (
@@ -707,7 +708,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
                   )
                 })}
                 <Link href={href({ page: String(Math.min(totalPages, currentPage + 1)) }) + '#schedule-list'} className={clsx('btn text-xs px-2.5', currentPage === totalPages && 'pointer-events-none opacity-40')}>
-                  ›
+                  ‹
                 </Link>
               </div>
               <div className="flex items-center gap-4">
