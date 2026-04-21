@@ -42,6 +42,15 @@ type TimelineRow = {
   isPhase: boolean
 }
 
+type NotificationItem = {
+  id: string
+  label: string
+  description: string
+  href: string
+  tone: 'red' | 'yellow' | 'blue'
+  count: number
+}
+
 const PROJECT_SELECT = 'id, name, status'
 const DETAIL_SELECT = `
   id,
@@ -93,8 +102,22 @@ function dayLabel(day: Date) {
   return format(day, 'd', { locale: ja })
 }
 
+function notificationToneClass(tone: NotificationItem['tone']) {
+  if (tone === 'red') return 'bg-red-50 text-red-700 border-red-100'
+  if (tone === 'yellow') return 'bg-amber-50 text-amber-700 border-amber-100'
+  return 'bg-blue-50 text-blue-700 border-blue-100'
+}
+
 export default async function SchedulePage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = createServerSupabaseClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: profile } = user
+    ? await supabase.from('users').select('name').eq('id', user.id).single()
+    : { data: null }
 
   const { data: projects } = await supabase
     .from('projects')
@@ -206,12 +229,15 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
     return segments
   }, [])
 
+  const todayKey = format(new Date(), 'yyyy-MM-dd')
+  const soonKey = format(addDays(new Date(), 3), 'yyyy-MM-dd')
+
   const taskRows = datedTasks
     .map(task => {
       const startDate = parseDate(task.start_date)
       const endDate = parseDate(task.end_date)
       const duration = startDate && endDate ? differenceInCalendarDays(endDate, startDate) + 1 : null
-      const isOverdue = !!task.end_date && task.end_date < format(new Date(), 'yyyy-MM-dd') && task.status !== 'completed'
+      const isOverdue = !!task.end_date && task.end_date < todayKey && task.status !== 'completed'
 
       return {
         id: task.id,
@@ -237,6 +263,9 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
     completed: taskRows.filter(task => task.status === 'completed').length,
     overdue: taskRows.filter(task => task.isOverdue).length,
   }
+
+  const dueTodayCount = taskRows.filter(task => task.end === todayKey && task.status !== 'completed').length
+  const soonCount = taskRows.filter(task => !!task.end && task.end > todayKey && task.end <= soonKey && task.status !== 'completed').length
 
   const filteredRows = taskRows.filter(task => {
     if (filter === 'all') return true
@@ -284,12 +313,41 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
   }
 
   const selectedProjectName = project?.name ?? '案件未選択'
+  const userName = profile?.name ?? user?.email ?? 'ユーザー'
   const taskAddHref = selectedId
     ? phases[0]?.id
       ? `/projects/${selectedId}/phases/${phases[0].id}/tasks/new`
       : `/projects/${selectedId}/phases/new`
     : '/projects'
   const projectQuery = selectedId ? `?project_id=${selectedId}` : ''
+  const notificationSeed = [
+    {
+      id: 'overdue',
+      label: '遅延タスク',
+      description: '期限超過のタスクがあります',
+      href: '/tasks?filter=overdue',
+      tone: 'red' as const,
+      count: stats.overdue,
+    },
+    {
+      id: 'today',
+      label: '本日期限',
+      description: '今日が期限のタスクです',
+      href: `/calendar${projectQuery}`,
+      tone: 'yellow' as const,
+      count: dueTodayCount,
+    },
+    {
+      id: 'soon',
+      label: '直近3日',
+      description: '数日以内に期限が来るタスクです',
+      href: '/tasks',
+      tone: 'blue' as const,
+      count: soonCount,
+    },
+  ] satisfies NotificationItem[]
+  const notifications = notificationSeed.filter(item => item.count > 0)
+  const notificationCount = notifications.reduce((sum, item) => sum + item.count, 0)
 
   return (
     <div className="px-6 py-5">
@@ -315,22 +373,50 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
           </form>
         </div>
         <div className="flex items-center gap-3 text-gray-500">
-          <button className="h-9 w-9 rounded-full hover:bg-gray-50 flex items-center justify-center">
-            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-              <path d="m14 14-3.2-3.2m2.2-4.1a4.7 4.7 0 1 1-9.4 0 4.7 4.7 0 0 1 9.4 0Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-            </svg>
-          </button>
-          <button className="h-9 w-9 rounded-full hover:bg-gray-50 flex items-center justify-center relative">
-            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-              <path d="M10 4.5a3 3 0 0 0-3 3v1.2c0 .5-.2.9-.5 1.3l-.9 1.1h8.8l-.9-1.1c-.3-.4-.5-.8-.5-1.3V7.5a3 3 0 0 0-3-3ZM8.5 14a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-red-500 px-1 text-[10px] text-white flex items-center justify-center">3</span>
-          </button>
+          <details className="group relative">
+            <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full hover:bg-gray-50 relative">
+              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+                <path d="M10 4.5a3 3 0 0 0-3 3v1.2c0 .5-.2.9-.5 1.3l-.9 1.1h8.8l-.9-1.1c-.3-.4-.5-.8-.5-1.3V7.5a3 3 0 0 0-3-3ZM8.5 14a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {notificationCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-red-500 px-1 text-[10px] text-white flex items-center justify-center">
+                  {notificationCount}
+                </span>
+              )}
+            </summary>
+            <div className="absolute right-0 top-11 z-20 hidden w-[320px] rounded-xl border border-gray-200 bg-white p-3 shadow-xl group-open:block">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <p className="text-sm font-semibold text-gray-900">通知</p>
+                <span className="text-xs text-gray-400">{notificationCount}件</span>
+              </div>
+              <div className="space-y-2">
+                {notifications.length === 0 ? (
+                  <div className="rounded-lg bg-gray-50 px-3 py-6 text-center text-sm text-gray-400">
+                    今すぐ確認が必要な通知はありません
+                  </div>
+                ) : (
+                  notifications.map(item => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={clsx('block rounded-lg border px-3 py-3 transition-colors hover:bg-gray-50', notificationToneClass(item.tone))}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="text-xs font-semibold">{item.count}件</span>
+                      </div>
+                      <p className="text-xs opacity-80">{item.description}</p>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </details>
           <div className="h-9 px-3 rounded-full border border-gray-200 bg-white flex items-center gap-2 text-sm text-gray-700">
             <span className="h-7 w-7 rounded-full bg-[#eef3ff] text-[#2563eb] flex items-center justify-center text-xs font-semibold">
-              {selectedProjectName.charAt(0)}
+              {userName.charAt(0)}
             </span>
-            <span>{selectedProjectName}</span>
+            <span>{userName}</span>
           </div>
         </div>
       </div>
@@ -622,7 +708,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
                   )
                 })}
                 <Link href={href({ page: String(Math.min(totalPages, currentPage + 1)) }) + '#schedule-list'} className={clsx('btn text-xs px-2.5', currentPage === totalPages && 'pointer-events-none opacity-40')}>
-                  ›
+                  ‹
                 </Link>
               </div>
               <div className="flex items-center gap-4">
