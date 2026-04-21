@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
 
@@ -46,9 +46,9 @@ const REPORT_ITEMS = [
 
 const SCHEDULE_CHILDREN = [
   { href: '/schedule', label: '工程表・スケジュール管理' },
-  { href: '/gantt', label: 'マイルストーン' },
+  { href: '/milestones', label: 'マイルストーン' },
   { href: '/tasks', label: 'タスク一覧' },
-  { href: '/schedule?panel=calendar', label: 'カレンダー' },
+  { href: '/calendar', label: 'カレンダー' },
 ]
 
 function isSamePath(pathname: string, href: string) {
@@ -57,7 +57,6 @@ function isSamePath(pathname: string, href: string) {
 
 export default function Sidebar({ userName, isAdmin }: { userName: string; isAdmin: boolean }) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const router = useRouter()
   const supabase = createClient()
 
@@ -66,8 +65,9 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
     router.push('/login')
   }
 
-  const panel = searchParams.get('panel')
-  const isScheduleOpen = pathname === '/schedule' || pathname === '/gantt' || pathname === '/tasks'
+  const isScheduleOpen = ['/schedule', '/gantt', '/tasks', '/calendar', '/milestones'].some(path =>
+    pathname === path || pathname.startsWith(`${path}/`)
+  )
 
   return (
     <aside className="w-[222px] shrink-0 border-r border-gray-200 bg-white flex flex-col min-h-screen sticky top-0">
@@ -103,12 +103,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
                 {item.href === '/schedule' && isScheduleOpen && (
                   <div className="ml-7 mt-1 space-y-1 border-l border-gray-100 pl-3">
                     {SCHEDULE_CHILDREN.map(child => {
-                      const childActive =
-                        child.href === '/schedule?panel=calendar'
-                          ? pathname === '/schedule' && panel === 'calendar'
-                          : child.href === '/schedule'
-                            ? pathname === '/schedule' && panel !== 'calendar'
-                            : isSamePath(pathname, child.href)
+                      const childActive = isSamePath(pathname, child.href)
 
                       return (
                         <Link
