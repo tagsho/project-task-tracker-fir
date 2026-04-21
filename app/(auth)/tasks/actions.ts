@@ -23,18 +23,36 @@ function getStatus(value: FormDataEntryValue | null) {
 
 export async function updateTaskListItem(taskId: number, formData: FormData) {
   const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
 
   const progress = boundedProgress(formData.get('progress'))
   const status = getStatus(formData.get('status'))
+
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('phase_id')
+    .eq('id', taskId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  let projectId: number | null = null
+
+  if (task?.phase_id) {
+    const { data: phase } = await supabase
+      .from('phases')
+      .select('project_id')
+      .eq('id', task.phase_id)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    projectId = phase?.project_id ?? null
+  }
 
   let query = supabase
     .from('tasks')
@@ -53,4 +71,9 @@ export async function updateTaskListItem(taskId: number, formData: FormData) {
   revalidatePath('/tasks')
   revalidatePath('/schedule')
   revalidatePath('/gantt')
+  revalidatePath('/projects')
+
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`)
+  }
 }
