@@ -27,6 +27,14 @@ function redirectWithError(error: string) {
   redirect(`/users?error=${encodeURIComponent(error)}`)
 }
 
+function getSupabaseAdminClient() {
+  try {
+    return createAdminSupabaseClient()
+  } catch {
+    redirectWithError('service-role-missing')
+  }
+}
+
 export async function createUser(formData: FormData) {
   await requireAdmin()
 
@@ -43,12 +51,7 @@ export async function createUser(formData: FormData) {
     redirectWithError('invalid-role')
   }
 
-  let supabaseAdmin: ReturnType<typeof createAdminSupabaseClient>
-  try {
-    supabaseAdmin = createAdminSupabaseClient()
-  } catch {
-    redirectWithError('service-role-missing')
-  }
+  const supabaseAdmin = getSupabaseAdminClient()
 
   const { data: existingUser } = await supabaseAdmin
     .from('users')
