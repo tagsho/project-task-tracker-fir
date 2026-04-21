@@ -7,12 +7,12 @@ import {
 } from '@/lib/project-schedule-transfer'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const projectId = Number(params.id)
   if (!Number.isFinite(projectId)) {
-    return NextResponse.redirect(new URL('/projects', 'http://localhost'))
+    return NextResponse.redirect(new URL('/projects', request.url))
   }
 
   const supabase = createServerSupabaseClient()
@@ -21,7 +21,7 @@ export async function GET(
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.redirect(new URL('/login', 'http://localhost'))
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   const { data: project } = await supabase
@@ -59,12 +59,12 @@ export async function GET(
     .single()
 
   if (!project) {
-    return NextResponse.redirect(new URL('/projects', 'http://localhost'))
+    return NextResponse.redirect(new URL('/projects', request.url))
   }
 
   const workbook = buildScheduleWorkbook(project.name, buildScheduleExportRows(project))
 
-  return new NextResponse(workbook as BodyInit, {
+  return new NextResponse(new Uint8Array(workbook), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${sanitizeDownloadName(projectId, 'xlsx')}"`,
