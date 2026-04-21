@@ -39,7 +39,7 @@ const MAIN_ITEMS = [
 const REPORT_ITEMS = [
   {
     href: '/gantt',
-    label: 'レポート',
+    label: 'ガントチャート',
     icon: 'M4.5 14.5V5.5M9.5 14.5v-4M14.5 14.5v-8',
   },
 ]
@@ -47,7 +47,6 @@ const REPORT_ITEMS = [
 const SCHEDULE_CHILDREN = [
   { href: '/schedule', label: '工程表・スケジュール管理' },
   { href: '/milestones', label: 'マイルストーン' },
-  { href: '/tasks', label: 'タスク一覧' },
   { href: '/calendar', label: 'カレンダー' },
 ]
 
@@ -65,7 +64,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
     router.push('/login')
   }
 
-  const isScheduleOpen = ['/schedule', '/gantt', '/tasks', '/calendar', '/milestones'].some(path =>
+  const isScheduleOpen = ['/schedule', '/calendar', '/milestones'].some(path =>
     pathname === path || pathname.startsWith(`${path}/`)
   )
 

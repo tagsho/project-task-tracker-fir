@@ -9,7 +9,6 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  isSameMonth,
   isToday,
   max,
   min,
@@ -290,6 +289,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
       ? `/projects/${selectedId}/phases/${phases[0].id}/tasks/new`
       : `/projects/${selectedId}/phases/new`
     : '/projects'
+  const projectQuery = selectedId ? `?project_id=${selectedId}` : ''
 
   return (
     <div className="px-6 py-5">
@@ -341,16 +341,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
           <p className="text-sm text-gray-400 mt-1">{selectedProjectName}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={href({ panel: 'table', page: '1' })} className="btn-primary text-xs">
+          <Link href={`/gantt${projectQuery}`} className="btn text-xs">
             ガントチャート
           </Link>
-          <Link href={href({ panel: 'table', page: '1' }) + '#schedule-list'} className="btn text-xs">
+          <Link href={href({ panel: 'table', page: '1' }) + '#schedule-list'} className="btn-primary text-xs">
             スケジュール表
           </Link>
-          <Link href={href({ panel: 'calendar', page: '1' }) + '#schedule-list'} className="btn text-xs">
+          <Link href={`/calendar${projectQuery}`} className="btn text-xs">
             カレンダー
           </Link>
-          <button className="btn text-xs px-2.5">…</button>
+          <Link href={`/milestones${projectQuery}`} className="btn text-xs">
+            マイルストーン
+          </Link>
         </div>
       </div>
 
@@ -532,7 +534,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
                 const entries = tasksByDate[key] ?? []
                 return (
                   <div key={key} className={clsx('min-h-[110px] border-b border-r border-gray-100 px-2 py-2', isToday(day) && 'bg-[#f8fbff]')}>
-                    <div className={clsx('mb-2 flex h-7 w-7 items-center justify-center rounded-full text-xs', isToday(day) ? 'bg-[#2563eb] text-white' : isSameMonth(day, calendarMonthStart) ? 'text-gray-700' : 'text-gray-300')}>
+                    <div className={clsx('mb-2 flex h-7 w-7 items-center justify-center rounded-full text-xs', isToday(day) ? 'bg-[#2563eb] text-white' : 'text-gray-700')}>
                       {format(day, 'd')}
                     </div>
                     <div className="space-y-1">
