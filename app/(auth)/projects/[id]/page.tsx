@@ -9,6 +9,7 @@ import DeleteProjectButton from '@/components/DeleteProjectButton'
 import DeletePhaseButton from '@/components/DeletePhaseButton'
 import DeleteTaskButton from '@/components/DeleteTaskButton'
 import ScheduleImportForm from '@/components/ScheduleImportForm'
+import { measureServerStep, logServerSummary } from '@/lib/perf'
 import { deleteProject } from '../actions'
 import { deletePhase } from './phases/actions'
 import { deleteTask } from './phases/[phaseId]/tasks/actions'
@@ -16,38 +17,77 @@ import { updateTaskListItem } from '../../tasks/actions'
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
+  const pageStartedAt = Date.now()
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select(`
-      *,
-      owner:users(name),
-      phases(
-        *,
-        tasks(*, assignee:users(name))
-      )
-    `)
-    .eq('id', params.id)
-    .is('deleted_at', null)
-    .single()
+  const [projectResult, authResult] = await Promise.all([
+    measureServerStep(`project-detail:project:${params.id}`, () =>
+      supabase
+        .from('projects')
+        .select('id, name, status, progress, start_date, end_date, owner:users(name)')
+        .eq('id', params.id)
+        .is('deleted_at', null)
+        .single(),
+    ),
+    measureServerStep('project-detail:auth-user', () => supabase.auth.getUser()),
+  ])
 
+  const project = projectResult.data
   if (!project) notFound()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
-  const isAdmin = profile?.role === 'admin'
+  const user = authResult.data.user
+
+  const [profileResult, phasesResult] = await Promise.all([
+    measureServerStep('project-detail:profile', () =>
+      supabase.from('users').select('role').eq('id', user!.id).single(),
+    ),
+    measureServerStep(`project-detail:phases:${params.id}`, () =>
+      supabase
+        .from('phases')
+        .select('id, name, status, progress, sort_order, start_date, end_date, deleted_at')
+        .eq('project_id', params.id)
+        .is('deleted_at', null)
+        .order('sort_order'),
+    ),
+  ])
+
+  const isAdmin = profileResult.data?.role === 'admin'
   const deleteAction = deleteProject.bind(null, Number(project.id))
+  const phases = (phasesResult.data ?? []).filter((phase: any) => !phase.deleted_at)
+  const phaseIds = phases.map((phase: any) => phase.id)
 
-  const phases = ((project.phases as any[]) ?? [])
-    .filter((phase: any) => !phase.deleted_at)
-    .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const tasksResult = phaseIds.length
+    ? await measureServerStep(`project-detail:tasks:${params.id}`, () =>
+        supabase
+          .from('tasks')
+          .select('id, phase_id, name, status, priority, progress, start_date, end_date, deleted_at, assignee_id, assignee:users(name)')
+          .in('phase_id', phaseIds)
+          .is('deleted_at', null)
+          .order('created_at'),
+      )
+    : { data: [] as any[] }
 
-  const allTasks = phases.flatMap((p: any) => (p.tasks ?? []).filter((task: any) => !task.deleted_at))
+  const tasksByPhaseId = (tasksResult.data ?? []).reduce<Record<number, any[]>>((map, task: any) => {
+    if (!map[task.phase_id]) map[task.phase_id] = []
+    map[task.phase_id].push(task)
+    return map
+  }, {})
+
+  const hydratedPhases = phases.map((phase: any) => ({
+    ...phase,
+    tasks: (tasksByPhaseId[phase.id] ?? []).filter((task: any) => !task.deleted_at),
+  }))
+
+  const allTasks = hydratedPhases.flatMap((phase: any) => phase.tasks ?? [])
   const autoProgress = allTasks.length
-    ? Math.round((allTasks.filter((t: any) => t.status === 'completed').length / allTasks.length) * 100)
+    ? Math.round((allTasks.filter((task: any) => task.status === 'completed').length / allTasks.length) * 100)
     : 0
+
+  logServerSummary('project-detail:summary', {
+    projectId: Number(project.id),
+    phaseCount: hydratedPhases.length,
+    taskCount: allTasks.length,
+    durationMs: Date.now() - pageStartedAt,
+  })
 
   const status = project.status as keyof typeof STATUS_COLOR
 
@@ -124,7 +164,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
         </div>
 
         <div className="space-y-3">
-          {phases.map((phase: any) => {
+          {hydratedPhases.map((phase: any) => {
             const phaseDeleteAction = deletePhase.bind(null, Number(project.id), Number(phase.id))
             const tasks = ((phase.tasks as any[]) ?? []).filter((task: any) => !task.deleted_at)
 
