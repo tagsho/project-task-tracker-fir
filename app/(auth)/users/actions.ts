@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import type { Role } from '@/types'
+import type { Role, UserAdminAuditAction } from '@/types'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 
@@ -49,8 +49,35 @@ function requireCreatedUser<T extends { user: { id: string } | null }>(createdAu
   return createdAuthUser.user
 }
 
+async function insertAuditLog(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  input: {
+    actorUserId: string
+    targetUserId: string
+    action: UserAdminAuditAction
+    oldRole?: Role | null
+    newRole?: Role | null
+    oldIsActive?: boolean | null
+    newIsActive?: boolean | null
+  },
+) {
+  const { error } = await supabase.from('user_admin_audit_logs').insert({
+    actor_user_id: input.actorUserId,
+    target_user_id: input.targetUserId,
+    action: input.action,
+    old_role: input.oldRole ?? null,
+    new_role: input.newRole ?? null,
+    old_is_active: input.oldIsActive ?? null,
+    new_is_active: input.newIsActive ?? null,
+  })
+
+  if (error && error.code !== '42P01') {
+    console.error('Failed to insert user audit log', error)
+  }
+}
+
 export async function createUser(formData: FormData) {
-  await requireAdminUser()
+  const { supabase, user } = await requireAdminUser()
 
   const name = String(formData.get('name') ?? '').trim()
   const email = String(formData.get('email') ?? '').trim().toLowerCase()
@@ -108,6 +135,14 @@ export async function createUser(formData: FormData) {
     redirectWithError('profile-create-failed')
   }
 
+  await insertAuditLog(supabase, {
+    actorUserId: user.id,
+    targetUserId: createdUser.id,
+    action: 'user_created',
+    newRole: role,
+    newIsActive: true,
+  })
+
   revalidatePath('/users')
   redirect('/users?created=1')
 }
@@ -124,6 +159,12 @@ export async function updateUserRole(userId: string, formData: FormData) {
     redirectWithError('invalid-role')
   }
 
+  const { data: targetUser } = await supabase
+    .from('users')
+    .select('role, is_active')
+    .eq('id', userId)
+    .single()
+
   const { error } = await supabase
     .from('users')
     .update({ role })
@@ -132,6 +173,16 @@ export async function updateUserRole(userId: string, formData: FormData) {
   if (error) {
     redirectWithError('user-update-failed')
   }
+
+  await insertAuditLog(supabase, {
+    actorUserId: user.id,
+    targetUserId: userId,
+    action: 'role_changed',
+    oldRole: targetUser?.role ?? null,
+    newRole: role,
+    oldIsActive: targetUser?.is_active ?? null,
+    newIsActive: targetUser?.is_active ?? null,
+  })
 
   revalidatePath('/users')
 }
@@ -144,6 +195,12 @@ export async function updateUserActive(userId: string, formData: FormData) {
     redirectWithError('self-protected')
   }
 
+  const { data: targetUser } = await supabase
+    .from('users')
+    .select('role, is_active')
+    .eq('id', userId)
+    .single()
+
   const { error } = await supabase
     .from('users')
     .update({ is_active: isActive })
@@ -152,6 +209,16 @@ export async function updateUserActive(userId: string, formData: FormData) {
   if (error) {
     redirectWithError('user-update-failed')
   }
+
+  await insertAuditLog(supabase, {
+    actorUserId: user.id,
+    targetUserId: userId,
+    action: 'active_changed',
+    oldRole: targetUser?.role ?? null,
+    newRole: targetUser?.role ?? null,
+    oldIsActive: targetUser?.is_active ?? null,
+    newIsActive: isActive,
+  })
 
   revalidatePath('/users')
 }
