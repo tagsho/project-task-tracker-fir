@@ -25,6 +25,7 @@ npm run dev
 重くなりやすい一覧・ダッシュボード系のクエリ向けに、以下のindex追加SQLを用意しています。
 
 - `supabase/migrations/20260421_add_performance_indexes.sql`
+- `supabase/migrations/20260422_harden_users_rls.sql`
 
 Supabase SQL Editorで実行するか、運用中のmigrationフローに組み込んで適用してください。
 

@@ -44,13 +44,32 @@ export async function POST(request: NextRequest) {
           })
         },
       },
-    }
+    },
   )
 
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.redirect(new URL('/login?error=invalid', request.url), { status: 303 })
+  }
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('is_active')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut()
+    response.headers.set('Location', new URL('/login?error=inactive', request.url).toString())
   }
 
   return response

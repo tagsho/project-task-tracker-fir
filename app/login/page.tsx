@@ -3,7 +3,12 @@ export default function LoginPage({
 }: {
   searchParams?: { error?: string }
 }) {
-  const hasError = searchParams?.error === 'invalid'
+  const error = searchParams?.error
+  const message = error === 'inactive'
+    ? 'このアカウントは無効化されています。管理者にお問い合わせください。'
+    : error === 'invalid'
+      ? 'メールアドレスまたはパスワードが正しくありません'
+      : null
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -35,9 +40,9 @@ export default function LoginPage({
                 required
               />
             </div>
-            {hasError && (
+            {message && (
               <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
-                メールアドレスまたはパスワードが正しくありません
+                {message}
               </p>
             )}
             <button type="submit" className="btn-primary w-full justify-center">
