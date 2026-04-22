@@ -8,9 +8,15 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const USER_ROLES: Role[] = ['admin', 'member']
 
-async function requireAdmin() {
+function redirectWithError(error: string) {
+  redirect(`/users?error=${encodeURIComponent(error)}`)
+}
+
+async function requireAdminUser() {
   const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
@@ -21,10 +27,8 @@ async function requireAdmin() {
     .single()
 
   if (profile?.role !== 'admin') redirect('/dashboard')
-}
 
-function redirectWithError(error: string) {
-  redirect(`/users?error=${encodeURIComponent(error)}`)
+  return { supabase, user }
 }
 
 function getSupabaseAdminClient(): ReturnType<typeof createAdminSupabaseClient> {
@@ -36,12 +40,9 @@ function getSupabaseAdminClient(): ReturnType<typeof createAdminSupabaseClient> 
   }
 }
 
-function requireCreatedUser<T extends { user: { id: string } | null }>(
-  createdAuthUser: T,
-  authErrorMessage?: string,
-) {
+function requireCreatedUser<T extends { user: { id: string } | null }>(createdAuthUser: T) {
   if (!createdAuthUser.user) {
-    redirectWithError(authErrorMessage || 'auth-create-failed')
+    redirectWithError('auth-create-failed')
     throw new Error('unreachable')
   }
 
@@ -49,7 +50,7 @@ function requireCreatedUser<T extends { user: { id: string } | null }>(
 }
 
 export async function createUser(formData: FormData) {
-  await requireAdmin()
+  await requireAdminUser()
 
   const name = String(formData.get('name') ?? '').trim()
   const email = String(formData.get('email') ?? '').trim().toLowerCase()
@@ -86,26 +87,71 @@ export async function createUser(formData: FormData) {
   })
 
   if (authError || !createdAuthUser) {
-    redirectWithError(authError?.message || 'auth-create-failed')
+    redirectWithError('auth-create-failed')
   }
 
-  const createdUser = requireCreatedUser(createdAuthUser, authError?.message)
+  const createdUser = requireCreatedUser(createdAuthUser)
 
-  const { error: profileError } = await supabaseAdmin
-    .from('users')
-    .upsert({
+  const { error: profileError } = await supabaseAdmin.from('users').upsert(
+    {
       id: createdUser.id,
       name,
       login_id: email,
       role,
       is_active: true,
-    }, { onConflict: 'id' })
+    },
+    { onConflict: 'id' },
+  )
 
   if (profileError) {
     await supabaseAdmin.auth.admin.deleteUser(createdUser.id)
-    redirectWithError(profileError.message || 'profile-create-failed')
+    redirectWithError('profile-create-failed')
   }
 
   revalidatePath('/users')
   redirect('/users?created=1')
+}
+
+export async function updateUserRole(userId: string, formData: FormData) {
+  const { supabase, user } = await requireAdminUser()
+  const role = String(formData.get('role') ?? '') as Role
+
+  if (userId === user.id) {
+    redirectWithError('self-protected')
+  }
+
+  if (!USER_ROLES.includes(role)) {
+    redirectWithError('invalid-role')
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ role })
+    .eq('id', userId)
+
+  if (error) {
+    redirectWithError('user-update-failed')
+  }
+
+  revalidatePath('/users')
+}
+
+export async function updateUserActive(userId: string, formData: FormData) {
+  const { supabase, user } = await requireAdminUser()
+  const isActive = String(formData.get('is_active') ?? 'true') === 'true'
+
+  if (userId === user.id) {
+    redirectWithError('self-protected')
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ is_active: isActive })
+    .eq('id', userId)
+
+  if (error) {
+    redirectWithError('user-update-failed')
+  }
+
+  revalidatePath('/users')
 }
