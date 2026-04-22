@@ -73,14 +73,16 @@ export async function createUser(formData: FormData) {
     },
   })
 
-  if (authError || !createdAuthUser.user) {
+  const createdUser = createdAuthUser.user
+
+  if (authError || !createdUser) {
     redirectWithError(authError?.message || 'auth-create-failed')
   }
 
   const { error: profileError } = await supabaseAdmin
     .from('users')
     .upsert({
-      id: createdAuthUser.user.id,
+      id: createdUser.id,
       name,
       login_id: email,
       role,
@@ -88,7 +90,7 @@ export async function createUser(formData: FormData) {
     }, { onConflict: 'id' })
 
   if (profileError) {
-    await supabaseAdmin.auth.admin.deleteUser(createdAuthUser.user.id)
+    await supabaseAdmin.auth.admin.deleteUser(createdUser.id)
     redirectWithError(profileError.message || 'profile-create-failed')
   }
 
