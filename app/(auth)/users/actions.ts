@@ -27,11 +27,12 @@ function redirectWithError(error: string) {
   redirect(`/users?error=${encodeURIComponent(error)}`)
 }
 
-function getSupabaseAdminClient() {
+function getSupabaseAdminClient(): ReturnType<typeof createAdminSupabaseClient> {
   try {
     return createAdminSupabaseClient()
   } catch {
     redirectWithError('service-role-missing')
+    throw new Error('unreachable')
   }
 }
 
