@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { logServerSummary, measureServerStep } from '@/lib/perf'
 import { PRIORITY_COLOR, PRIORITY_LABEL, STATUS_COLOR, STATUS_LABEL } from '@/types'
 import {
   addDays,
@@ -52,32 +53,20 @@ type NotificationItem = {
 }
 
 const PROJECT_SELECT = 'id, name, status'
-const DETAIL_SELECT = `
+const PHASE_SELECT = 'id, name, status, progress, sort_order, start_date, end_date, deleted_at'
+const TASK_SELECT = `
   id,
+  phase_id,
   name,
-  phases(
-    id,
-    name,
-    status,
-    progress,
-    sort_order,
-    start_date,
-    end_date,
-    deleted_at,
-    tasks(
-      id,
-      name,
-      status,
-      priority,
-      progress,
-      start_date,
-      end_date,
-      updated_at,
-      deleted_at,
-      assignee_id,
-      assignee:users(name)
-    )
-  )
+  status,
+  priority,
+  progress,
+  start_date,
+  end_date,
+  updated_at,
+  deleted_at,
+  assignee_id,
+  assignee:users(name)
 `
 
 function parseDate(value?: string) {
@@ -109,44 +98,72 @@ function notificationToneClass(tone: NotificationItem['tone']) {
 }
 
 export default async function SchedulePage({ searchParams }: { searchParams: SearchParams }) {
+  const startedAt = Date.now()
   const supabase = createServerSupabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await measureServerStep('schedule.auth.getUser', () => supabase.auth.getUser())
 
   const { data: profile } = user
-    ? await supabase.from('users').select('name').eq('id', user.id).single()
+    ? await measureServerStep('schedule.profile.name', () =>
+        supabase.from('users').select('name').eq('id', user.id).single(),
+      )
     : { data: null }
 
-  const { data: projects } = await supabase
-    .from('projects')
-    .select(PROJECT_SELECT)
-    .is('deleted_at', null)
-    .order('name')
+  const { data: projects } = await measureServerStep('schedule.projects', () =>
+    supabase
+      .from('projects')
+      .select(PROJECT_SELECT)
+      .is('deleted_at', null)
+      .order('name'),
+  )
 
   const selectedId = searchParams.project_id ?? projects?.[0]?.id?.toString() ?? ''
+  const selectedProject = projects?.find(projectOption => projectOption.id?.toString() === selectedId) ?? null
   const panel = searchParams.panel === 'calendar' ? 'calendar' : 'table'
   const filter = searchParams.filter ?? 'all'
   const page = Math.max(1, Number(searchParams.page ?? '1') || 1)
   const anchorDate = parseDate(searchParams.anchor) ?? new Date()
   const showFull = searchParams.full === '1'
 
-  let project: any = null
+  let phases: any[] = []
   if (selectedId) {
-    const { data } = await supabase
-      .from('projects')
-      .select(DETAIL_SELECT)
-      .eq('id', selectedId)
-      .is('deleted_at', null)
-      .single()
+    const { data: phaseRows } = await measureServerStep('schedule.phases', () =>
+      supabase
+        .from('phases')
+        .select(PHASE_SELECT)
+        .eq('project_id', selectedId)
+        .is('deleted_at', null)
+        .order('sort_order'),
+    )
 
-    project = data
+    const basePhases = (phaseRows ?? []).filter(phase => !phase.deleted_at)
+    const phaseIds = basePhases.map(phase => phase.id)
+
+    let tasksByPhase = new Map<number, any[]>()
+    if (phaseIds.length > 0) {
+      const { data: taskRows } = await measureServerStep('schedule.tasks', () =>
+        supabase
+          .from('tasks')
+          .select(TASK_SELECT)
+          .in('phase_id', phaseIds)
+          .is('deleted_at', null)
+          .order('start_date', { ascending: true }),
+      )
+
+      tasksByPhase = (taskRows ?? []).reduce((map, task) => {
+        if (!map.has(task.phase_id)) map.set(task.phase_id, [])
+        map.get(task.phase_id)!.push(task)
+        return map
+      }, new Map<number, any[]>())
+    }
+
+    phases = basePhases.map(phase => ({
+      ...phase,
+      tasks: tasksByPhase.get(phase.id) ?? [],
+    }))
   }
-
-  const phases = ((project?.phases as any[]) ?? [])
-    .filter(phase => !phase.deleted_at)
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   const datedTasks = phases.flatMap((phase, phaseIndex) =>
     ((phase.tasks as any[]) ?? [])
@@ -312,7 +329,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
     return `/schedule?${params.toString()}`
   }
 
-  const selectedProjectName = project?.name ?? '案件未選択'
+  const selectedProjectName = selectedProject?.name ?? '案件未選択'
   const userName = profile?.name ?? user?.email ?? 'ユーザー'
   const taskAddHref = selectedId
     ? phases[0]?.id
@@ -348,6 +365,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
   ] satisfies NotificationItem[]
   const notifications = notificationSeed.filter(item => item.count > 0)
   const notificationCount = notifications.reduce((sum, item) => sum + item.count, 0)
+
+  logServerSummary('schedule.page', {
+    selectedProjectId: selectedId || null,
+    projectCount: projects?.length ?? 0,
+    phaseCount: phases.length,
+    taskCount: taskRows.length,
+    durationMs: Date.now() - startedAt,
+  })
 
   return (
     <div className="px-6 py-5">
