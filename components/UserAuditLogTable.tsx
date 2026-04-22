@@ -40,7 +40,7 @@ export default function UserAuditLogTable({ logs }: { logs: UserAdminAuditLog[] 
     <div className="card mt-6 p-0 overflow-hidden">
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <h2 className="text-sm font-semibold text-gray-900">ユーザー管理監査ログ</h2>
-        <p className="text-[11px] text-gray-400">直近50件</p>
+        <p className="text-[11px] text-gray-400">直近30件</p>
       </div>
       <table className="w-full text-xs">
         <thead>
