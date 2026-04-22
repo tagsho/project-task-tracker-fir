@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import UserTable from '@/components/UserTable'
 import CreateUserForm from '@/components/CreateUserForm'
 import UserAuditLogTable from '@/components/UserAuditLogTable'
+import type { UserAdminAuditLog } from '@/types'
 import { createUser, updateUserActive, updateUserRole } from './actions'
 
 function getNotice(searchParams?: { created?: string; error?: string }) {
@@ -46,7 +47,7 @@ export default async function UsersPage({
   const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: users }, { data: auditLogs }] = await Promise.all([
+  const [{ data: users }, { data: rawAuditLogs }] = await Promise.all([
     supabase
       .from('users')
       .select('*')
@@ -57,6 +58,12 @@ export default async function UsersPage({
       .order('created_at', { ascending: false })
       .limit(50),
   ])
+
+  const auditLogs: UserAdminAuditLog[] = (rawAuditLogs ?? []).map((log: any) => ({
+    ...log,
+    actor_user: Array.isArray(log.actor_user) ? log.actor_user[0] ?? undefined : log.actor_user,
+    target_user: Array.isArray(log.target_user) ? log.target_user[0] ?? undefined : log.target_user,
+  }))
 
   const notice = getNotice(searchParams)
   const canCreateUsers = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -84,7 +91,7 @@ export default async function UsersPage({
         updateUserRoleAction={updateUserRole}
         updateUserActiveAction={updateUserActive}
       />
-      <UserAuditLogTable logs={auditLogs ?? []} />
+      <UserAuditLogTable logs={auditLogs} />
     </div>
   )
 }
