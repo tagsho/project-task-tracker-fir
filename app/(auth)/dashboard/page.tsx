@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { format, isToday, isPast } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import clsx from 'clsx'
+import { measureServerStep, logServerSummary } from '@/lib/perf'
 
 function kpiColor(count: number, activeColor: string) {
   return count > 0 ? activeColor : 'text-gray-500'
@@ -9,6 +10,7 @@ function kpiColor(count: number, activeColor: string) {
 
 export default async function DashboardPage() {
   const supabase = createServerSupabaseClient()
+  const pageStartedAt = Date.now()
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -19,36 +21,43 @@ export default async function DashboardPage() {
     { data: users },
     { data: userTasks },
   ] = await Promise.all([
-    supabase.from('projects').select('id', { count: 'exact', head: true })
-      .eq('status', 'in_progress').is('deleted_at', null),
-
-    supabase.from('tasks')
-      .select('id, name, end_date, assignee:users(name)')
-      .is('deleted_at', null)
-      .not('end_date', 'is', null)
-      .neq('status', 'completed')
-      .lte('end_date', today)
-      .order('end_date')
-      .limit(10),
-
-    supabase.from('projects')
-      .select('id, name, phases(tasks(status))')
-      .eq('status', 'in_progress')
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(8),
-
-    supabase.from('users')
-      .select('id, name')
-      .eq('is_active', true)
-      .limit(40),
-
-    supabase.from('tasks')
-      .select('assignee_id, status, end_date')
-      .is('deleted_at', null)
-      .neq('status', 'completed')
-      .not('assignee_id', 'is', null)
-      .limit(500),
+    measureServerStep('dashboard:in-progress-count', () =>
+      supabase.from('projects').select('id', { count: 'exact', head: true })
+        .eq('status', 'in_progress').is('deleted_at', null),
+    ),
+    measureServerStep('dashboard:urgent-tasks', () =>
+      supabase.from('tasks')
+        .select('id, name, end_date, assignee:users(name)')
+        .is('deleted_at', null)
+        .not('end_date', 'is', null)
+        .neq('status', 'completed')
+        .lte('end_date', today)
+        .order('end_date')
+        .limit(10),
+    ),
+    measureServerStep('dashboard:projects-progress', () =>
+      supabase.from('projects')
+        .select('id, name, phases(tasks(status))')
+        .eq('status', 'in_progress')
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(8),
+    ),
+    measureServerStep('dashboard:active-users', () =>
+      supabase.from('users')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(24),
+    ),
+    measureServerStep('dashboard:user-task-stats', () =>
+      supabase.from('tasks')
+        .select('assignee_id, status, end_date')
+        .is('deleted_at', null)
+        .neq('status', 'completed')
+        .not('assignee_id', 'is', null)
+        .order('end_date')
+        .limit(240),
+    ),
   ])
 
   const dueTodayCount = urgentTasks?.filter(t => isToday(new Date(t.end_date))).length ?? 0
@@ -76,10 +85,19 @@ export default async function DashboardPage() {
     return {
       totalTasks: tasks.length,
       overdueTasks: tasks.filter(task =>
-        task.end_date && isPast(new Date(task.end_date)) && task.status !== 'completed'
+        task.end_date && isPast(new Date(task.end_date)) && task.status !== 'completed',
       ).length,
     }
   }
+
+  logServerSummary('dashboard:summary', {
+    activeProjectCount,
+    urgentTaskCount: urgentTasks?.length ?? 0,
+    projectCards: projects?.length ?? 0,
+    activeUsers: users?.length ?? 0,
+    sampledUserTasks: userTasks?.length ?? 0,
+    durationMs: Date.now() - pageStartedAt,
+  })
 
   return (
     <div className="p-6">
