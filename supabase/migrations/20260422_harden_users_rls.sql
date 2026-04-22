@@ -2,6 +2,23 @@
 -- 1. users update is admin only
 -- 2. users select is limited for non-admins
 -- 3. admin audit logs are stored in a dedicated table
+-- 4. admin detection uses a SECURITY DEFINER helper to avoid users-table RLS recursion
+
+create or replace function public.current_user_is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.users
+    where id = auth.uid()
+      and role = 'admin'
+      and is_active = true
+  );
+$$;
 
 alter table public.users enable row level security;
 
@@ -30,11 +47,7 @@ create policy users_select
   for select
   to authenticated
   using (
-    (
-      select users_1.role
-      from public.users as users_1
-      where users_1.id = auth.uid()
-    ) = 'admin'
+    public.current_user_is_admin()
     or id = auth.uid()
     or is_active = true
   );
@@ -43,42 +56,20 @@ create policy users_update_admin_manage
   on public.users
   for update
   to authenticated
-  using (
-    (
-      select users.role
-      from public.users
-      where users.id = auth.uid()
-    ) = 'admin'
-  )
-  with check (
-    (
-      select users.role
-      from public.users
-      where users.id = auth.uid()
-    ) = 'admin'
-  );
+  using (public.current_user_is_admin())
+  with check (public.current_user_is_admin());
 
 create policy user_admin_audit_logs_select_admin
   on public.user_admin_audit_logs
   for select
   to authenticated
-  using (
-    (
-      select users.role
-      from public.users
-      where users.id = auth.uid()
-    ) = 'admin'
-  );
+  using (public.current_user_is_admin());
 
 create policy user_admin_audit_logs_insert_admin
   on public.user_admin_audit_logs
   for insert
   to authenticated
   with check (
-    (
-      select users.role
-      from public.users
-      where users.id = auth.uid()
-    ) = 'admin'
+    public.current_user_is_admin()
     and actor_user_id = auth.uid()
   );
