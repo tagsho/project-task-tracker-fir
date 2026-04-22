@@ -2,7 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import UserTable from '@/components/UserTable'
 import CreateUserForm from '@/components/CreateUserForm'
-import { createUser } from './actions'
+import { createUser, updateUserActive, updateUserRole } from './actions'
 
 function getNotice(searchParams?: { created?: string; error?: string }) {
   if (searchParams?.created === '1') {
@@ -22,11 +22,13 @@ function getNotice(searchParams?: { created?: string; error?: string }) {
     'email-already-exists': '同じメールアドレスのユーザーが既に存在します。',
     'auth-create-failed': '認証ユーザーの作成に失敗しました。',
     'profile-create-failed': 'ユーザープロフィールの保存に失敗しました。',
+    'self-protected': '自分自身の権限や有効状態はこの画面から変更できません。',
+    'user-update-failed': 'ユーザー情報の更新に失敗しました。',
   }
 
   return {
     tone: 'red' as const,
-    message: messageMap[decodedError] ?? decodedError,
+    message: messageMap[decodedError] ?? '処理に失敗しました。時間をおいて再度お試しください。',
   }
 }
 
@@ -37,7 +39,9 @@ export default async function UsersPage({
 }) {
   const supabase = createServerSupabaseClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
@@ -56,15 +60,22 @@ export default async function UsersPage({
       </div>
 
       {notice && (
-        <div className={notice.tone === 'green'
-          ? 'mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700'
-          : 'mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'}>
+        <div
+          className={notice.tone === 'green'
+            ? 'mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700'
+            : 'mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'}
+        >
           {notice.message}
         </div>
       )}
 
       <CreateUserForm action={createUser} enabled={canCreateUsers} />
-      <UserTable users={users ?? []} currentUserId={user!.id} />
+      <UserTable
+        users={users ?? []}
+        currentUserId={user!.id}
+        updateUserRoleAction={updateUserRole}
+        updateUserActiveAction={updateUserActive}
+      />
     </div>
   )
 }
