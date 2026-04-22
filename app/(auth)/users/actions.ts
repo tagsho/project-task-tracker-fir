@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { Role } from '@/types'
-import { createAdminSupabaseClient } from '@/lib/supabase-admin'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createAdminSupabaseClient } from '@/lib/supabase-admin'\nimport { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const USER_ROLES: Role[] = ['admin', 'member']
 
@@ -34,6 +33,18 @@ function getSupabaseAdminClient(): ReturnType<typeof createAdminSupabaseClient> 
     redirectWithError('service-role-missing')
     throw new Error('unreachable')
   }
+}
+
+function requireCreatedUser<T extends { user: { id: string } | null }>(
+  createdAuthUser: T,
+  authErrorMessage?: string,
+) {
+  if (!createdAuthUser.user) {
+    redirectWithError(authErrorMessage || 'auth-create-failed')
+    throw new Error('unreachable')
+  }
+
+  return createdAuthUser.user
 }
 
 export async function createUser(formData: FormData) {
@@ -73,11 +84,11 @@ export async function createUser(formData: FormData) {
     },
   })
 
-  const createdUser = createdAuthUser.user
-
-  if (authError || !createdUser) {
+  if (authError || !createdAuthUser) {
     redirectWithError(authError?.message || 'auth-create-failed')
   }
+
+  const createdUser = requireCreatedUser(createdAuthUser, authError?.message)
 
   const { error: profileError } = await supabaseAdmin
     .from('users')
