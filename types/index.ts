@@ -3,6 +3,7 @@ export type ProjectStatus = 'pending' | 'in_progress' | 'completed' | 'on_hold'
 export type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'on_hold'
 export type Priority = 'high' | 'medium' | 'low'
 export type EntityType = 'project' | 'phase' | 'task'
+export type UserAdminAuditAction = 'user_created' | 'role_changed' | 'active_changed'
 
 export interface User {
   id: string
@@ -11,6 +12,20 @@ export interface User {
   role: Role
   is_active: boolean
   created_at: string
+}
+
+export interface UserAdminAuditLog {
+  id: number
+  actor_user_id: string
+  target_user_id: string
+  action: UserAdminAuditAction
+  old_role: Role | null
+  new_role: Role | null
+  old_is_active: boolean | null
+  new_is_active: boolean | null
+  created_at: string
+  actor_user?: Pick<User, 'id' | 'name'>
+  target_user?: Pick<User, 'id' | 'name'>
 }
 
 export interface Project {
