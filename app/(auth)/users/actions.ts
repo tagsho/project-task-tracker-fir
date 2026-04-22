@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { Role } from '@/types'
-import { createAdminSupabaseClient } from '@/lib/supabase-admin'\nimport { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createAdminSupabaseClient } from '@/lib/supabase-admin'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const USER_ROLES: Role[] = ['admin', 'member']
 
