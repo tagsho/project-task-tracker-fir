@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import clsx from 'clsx'
 
@@ -50,6 +51,8 @@ const SCHEDULE_CHILDREN = [
   { href: '/calendar', label: 'カレンダー' },
 ]
 
+const PREFETCH_ROUTES = ['/schedule', '/tasks', '/projects', '/gantt', '/calendar', '/milestones']
+
 function isSamePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -58,6 +61,14 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    PREFETCH_ROUTES
+      .filter(route => route !== pathname)
+      .forEach(route => {
+        router.prefetch(route)
+      })
+  }, [pathname, router])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -90,6 +101,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
               <div key={item.href}>
                 <Link
                   href={item.href}
+                  prefetch
                   className={clsx(
                     'flex items-center gap-3 rounded-md px-3 py-2 transition-colors',
                     active ? 'bg-[#eef3ff] text-[#2563eb] font-medium' : 'hover:bg-gray-50'
@@ -108,6 +120,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
                         <Link
                           key={child.href}
                           href={child.href}
+                          prefetch
                           className={clsx(
                             'block rounded-md px-3 py-2 text-[13px] transition-colors',
                             childActive ? 'bg-[#eef3ff] text-[#2563eb] font-medium' : 'hover:bg-gray-50 text-gray-500'
@@ -131,6 +144,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
                 className={clsx(
                   'flex items-center gap-3 rounded-md px-3 py-2 transition-colors',
                   active ? 'bg-[#eef3ff] text-[#2563eb] font-medium' : 'hover:bg-gray-50'
@@ -144,6 +158,7 @@ export default function Sidebar({ userName, isAdmin }: { userName: string; isAdm
           {isAdmin && (
             <Link
               href="/users"
+              prefetch
               className={clsx(
                 'flex items-center gap-3 rounded-md px-3 py-2 transition-colors',
                 isSamePath(pathname, '/users') ? 'bg-[#eef3ff] text-[#2563eb] font-medium' : 'hover:bg-gray-50'
