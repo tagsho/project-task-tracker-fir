@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { logServerSummary, measureServerStep } from '@/lib/perf'
 import { redirect } from 'next/navigation'
 import UserTable from '@/components/UserTable'
 import CreateUserForm from '@/components/CreateUserForm'
@@ -39,24 +40,31 @@ export default async function UsersPage({
 }: {
   searchParams?: { created?: string; error?: string }
 }) {
+  const startedAt = Date.now()
   const supabase = createServerSupabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
+  } = await measureServerStep('users.auth.getUser', () => supabase.auth.getUser())
+  const { data: profile } = await measureServerStep('users.profile.role', () =>
+    supabase.from('users').select('role').eq('id', user!.id).single(),
+  )
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const [{ data: users }, { data: rawAuditLogs }] = await Promise.all([
-    supabase
-      .from('users')
-      .select('*')
-      .order('created_at'),
-    supabase
-      .from('user_admin_audit_logs')
-      .select('id, actor_user_id, target_user_id, action, old_role, new_role, old_is_active, new_is_active, created_at, actor_user:users!user_admin_audit_logs_actor_user_id_fkey(id, name), target_user:users!user_admin_audit_logs_target_user_id_fkey(id, name)')
-      .order('created_at', { ascending: false })
-      .limit(50),
+    measureServerStep('users.list', () =>
+      supabase
+        .from('users')
+        .select('id, name, login_id, role, is_active, created_at')
+        .order('created_at'),
+    ),
+    measureServerStep('users.auditLogs', () =>
+      supabase
+        .from('user_admin_audit_logs')
+        .select('id, actor_user_id, target_user_id, action, old_role, new_role, old_is_active, new_is_active, created_at, actor_user:users!user_admin_audit_logs_actor_user_id_fkey(id, name), target_user:users!user_admin_audit_logs_target_user_id_fkey(id, name)')
+        .order('created_at', { ascending: false })
+        .limit(30),
+    ),
   ])
 
   const auditLogs: UserAdminAuditLog[] = (rawAuditLogs ?? []).map((log: any) => ({
@@ -64,6 +72,12 @@ export default async function UsersPage({
     actor_user: Array.isArray(log.actor_user) ? log.actor_user[0] ?? undefined : log.actor_user,
     target_user: Array.isArray(log.target_user) ? log.target_user[0] ?? undefined : log.target_user,
   }))
+
+  logServerSummary('users.page', {
+    userCount: users?.length ?? 0,
+    auditLogCount: auditLogs.length,
+    durationMs: Date.now() - startedAt,
+  })
 
   const notice = getNotice(searchParams)
   const canCreateUsers = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)

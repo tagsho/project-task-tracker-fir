@@ -1,32 +1,44 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import GanttChart from '@/components/GanttChart'
+import { measureServerStep, logServerSummary } from '@/lib/perf'
 
 export default async function GanttPage({ searchParams }: { searchParams: { project_id?: string } }) {
   const supabase = createServerSupabaseClient()
+  const pageStartedAt = Date.now()
 
-  const { data: projects } = await supabase
-    .from('projects')
-    .select('id, name')
-    .eq('status', 'in_progress')
-    .is('deleted_at', null)
-    .order('name')
+  const [projectsResult, authResult] = await Promise.all([
+    measureServerStep('gantt:projects', () =>
+      supabase
+        .from('projects')
+        .select('id, name')
+        .eq('status', 'in_progress')
+        .is('deleted_at', null)
+        .order('name'),
+    ),
+    measureServerStep('gantt:auth-user', () => supabase.auth.getUser()),
+  ])
 
+  const projects = projectsResult.data
   const selectedId = searchParams.project_id ?? projects?.[0]?.id?.toString()
+  const user = authResult.data.user
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user!.id).single()
-  const isAdmin = profile?.role === 'admin'
+  const profileResult = await measureServerStep('gantt:profile', () =>
+    supabase.from('users').select('role').eq('id', user!.id).single(),
+  )
+  const isAdmin = profileResult.data?.role === 'admin'
 
   let tasks: any[] = []
   if (selectedId) {
-    const { data: phases } = await supabase
-      .from('phases')
-      .select('name, tasks(id, name, start_date, end_date, progress, status, assignee:users(name))')
-      .eq('project_id', selectedId)
-      .is('deleted_at', null)
-      .order('sort_order')
+    const phasesResult = await measureServerStep(`gantt:phases:${selectedId}`, () =>
+      supabase
+        .from('phases')
+        .select('name, tasks(id, name, start_date, end_date, progress, status, assignee:users(name))')
+        .eq('project_id', selectedId)
+        .is('deleted_at', null)
+        .order('sort_order'),
+    )
 
-    tasks = (phases ?? []).flatMap(phase =>
+    tasks = (phasesResult.data ?? []).flatMap(phase =>
       (phase.tasks ?? [])
         .filter((t: any) => t.start_date && t.end_date)
         .map((t: any) => ({
@@ -38,9 +50,16 @@ export default async function GanttPage({ searchParams }: { searchParams: { proj
           assignee: t.assignee?.name,
           status: t.status,
           phase: phase.name,
-        }))
+        })),
     )
   }
+
+  logServerSummary('gantt:summary', {
+    selectedProjectId: selectedId ?? null,
+    projectOptions: projects?.length ?? 0,
+    taskBars: tasks.length,
+    durationMs: Date.now() - pageStartedAt,
+  })
 
   return (
     <div className="p-6">

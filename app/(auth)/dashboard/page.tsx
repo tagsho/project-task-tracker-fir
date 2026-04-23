@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { format, isToday, isPast } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import clsx from 'clsx'
+import { measureServerStep, logServerSummary } from '@/lib/perf'
 
 function kpiColor(count: number, activeColor: string) {
   return count > 0 ? activeColor : 'text-gray-500'
@@ -9,51 +10,59 @@ function kpiColor(count: number, activeColor: string) {
 
 export default async function DashboardPage() {
   const supabase = createServerSupabaseClient()
+  const pageStartedAt = Date.now()
 
   const today = new Date().toISOString().split('T')[0]
 
-  const [
-    { count: inProgressCount },
-    { data: urgentTasks },
-    { data: projects },
-    { data: users },
-    { data: userTasks },
-  ] = await Promise.all([
-    supabase.from('projects').select('id', { count: 'exact', head: true })
-      .eq('status', 'in_progress').is('deleted_at', null),
-
-    supabase.from('tasks')
-      .select('id, name, end_date, assignee:users(name)')
-      .is('deleted_at', null)
-      .not('end_date', 'is', null)
-      .neq('status', 'completed')
-      .lte('end_date', today)
-      .order('end_date')
-      .limit(10),
-
-    supabase.from('projects')
-      .select('id, name, phases(tasks(status))')
-      .eq('status', 'in_progress')
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(8),
-
-    supabase.from('users')
-      .select('id, name')
-      .eq('is_active', true)
-      .limit(40),
-
-    supabase.from('tasks')
-      .select('assignee_id, status, end_date')
-      .is('deleted_at', null)
-      .neq('status', 'completed')
-      .not('assignee_id', 'is', null)
-      .limit(500),
+  const [inProgressResult, urgentTasksResult, projectsResult, usersResult, userTasksResult] = await Promise.all([
+    measureServerStep('dashboard:in-progress-count', () =>
+      supabase.from('projects').select('id', { count: 'exact', head: true })
+        .eq('status', 'in_progress').is('deleted_at', null),
+    ),
+    measureServerStep('dashboard:urgent-tasks', () =>
+      supabase.from('tasks')
+        .select('id, name, end_date, assignee:users(name)')
+        .is('deleted_at', null)
+        .not('end_date', 'is', null)
+        .neq('status', 'completed')
+        .lte('end_date', today)
+        .order('end_date')
+        .limit(10),
+    ),
+    measureServerStep('dashboard:projects-progress', () =>
+      supabase.from('projects')
+        .select('id, name, phases(tasks(status))')
+        .eq('status', 'in_progress')
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(8),
+    ),
+    measureServerStep('dashboard:active-users', () =>
+      supabase.from('users')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(24),
+    ),
+    measureServerStep('dashboard:user-task-stats', () =>
+      supabase.from('tasks')
+        .select('assignee_id, status, end_date')
+        .is('deleted_at', null)
+        .neq('status', 'completed')
+        .not('assignee_id', 'is', null)
+        .order('end_date')
+        .limit(240),
+    ),
   ])
 
-  const dueTodayCount = urgentTasks?.filter(t => isToday(new Date(t.end_date))).length ?? 0
-  const overdueCount = urgentTasks?.filter(t => !isToday(new Date(t.end_date))).length ?? 0
-  const activeProjectCount = inProgressCount ?? 0
+  const inProgressCount = inProgressResult.count ?? 0
+  const urgentTasks = urgentTasksResult.data ?? []
+  const projects = projectsResult.data ?? []
+  const users = usersResult.data ?? []
+  const userTasks = userTasksResult.data ?? []
+
+  const dueTodayCount = urgentTasks.filter(t => isToday(new Date(t.end_date))).length
+  const overdueCount = urgentTasks.filter(t => !isToday(new Date(t.end_date))).length
+  const activeProjectCount = inProgressCount
 
   function autoProgress(phases: any[]): number {
     const tasks = phases?.flatMap((p: any) => p.tasks ?? []) ?? []
@@ -72,14 +81,23 @@ export default async function DashboardPage() {
   }
 
   function getUserTaskStats(userId: string) {
-    const tasks = userTasks?.filter(task => task.assignee_id === userId) ?? []
+    const tasks = userTasks.filter(task => task.assignee_id === userId)
     return {
       totalTasks: tasks.length,
       overdueTasks: tasks.filter(task =>
-        task.end_date && isPast(new Date(task.end_date)) && task.status !== 'completed'
+        task.end_date && isPast(new Date(task.end_date)) && task.status !== 'completed',
       ).length,
     }
   }
+
+  logServerSummary('dashboard:summary', {
+    activeProjectCount,
+    urgentTaskCount: urgentTasks.length,
+    projectCards: projects.length,
+    activeUsers: users.length,
+    sampledUserTasks: userTasks.length,
+    durationMs: Date.now() - pageStartedAt,
+  })
 
   return (
     <div className="p-6">
@@ -106,11 +124,11 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="card">
           <h2 className="text-xs font-medium text-gray-700 mb-3">遅延・本日期限タスク</h2>
-          {urgentTasks?.length === 0 && (
+          {urgentTasks.length === 0 && (
             <p className="text-xs text-gray-400">なし</p>
           )}
           <div className="space-y-2">
-            {urgentTasks?.map(task => {
+            {urgentTasks.map(task => {
               const overdue = !isToday(new Date(task.end_date))
               const assigneeName = getAssigneeName(task.assignee)
 
@@ -134,7 +152,7 @@ export default async function DashboardPage() {
         <div className="card">
           <h2 className="text-xs font-medium text-gray-700 mb-3">案件進捗</h2>
           <div className="space-y-3">
-            {projects?.map(project => {
+            {projects.map(project => {
               const progress = autoProgress(project.phases ?? [])
               return (
                 <div key={project.id}>
@@ -158,7 +176,7 @@ export default async function DashboardPage() {
       <div className="card">
         <h2 className="text-xs font-medium text-gray-700 mb-3">担当者別タスク状況</h2>
         <div className="grid grid-cols-4 gap-3">
-          {users?.map(user => {
+          {users.map(user => {
             const { totalTasks, overdueTasks } = getUserTaskStats(user.id)
             if (totalTasks === 0) return null
             return (
