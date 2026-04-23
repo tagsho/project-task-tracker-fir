@@ -18,6 +18,7 @@ import {
   subWeeks,
 } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import clsx from 'clsx'
 
@@ -100,16 +101,9 @@ function notificationToneClass(tone: NotificationItem['tone']) {
 export default async function SchedulePage({ searchParams }: { searchParams: SearchParams }) {
   const startedAt = Date.now()
   const supabase = createServerSupabaseClient()
-
-  const {
-    data: { user },
-  } = await measureServerStep('schedule.auth.getUser', () => supabase.auth.getUser())
-
-  const { data: profile } = user
-    ? await measureServerStep('schedule.profile.name', () =>
-        supabase.from('users').select('name').eq('id', user.id).single(),
-      )
-    : { data: null }
+  const headerStore = headers()
+  const forwardedUserName = headerStore.get('x-auth-user-name')
+  const forwardedUserEmail = headerStore.get('x-auth-user-email')
 
   const { data: projects } = await measureServerStep('schedule.projects', () =>
     supabase
@@ -330,7 +324,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Sea
   }
 
   const selectedProjectName = selectedProject?.name ?? '案件未選択'
-  const userName = profile?.name ?? user?.email ?? 'ユーザー'
+  const userName = forwardedUserName || forwardedUserEmail || 'ユーザー'
   const taskAddHref = selectedId
     ? phases[0]?.id
       ? `/projects/${selectedId}/phases/${phases[0].id}/tasks/new`
