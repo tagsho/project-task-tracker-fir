@@ -1,3 +1,5 @@
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { PRIORITY_COLOR, PRIORITY_LABEL, STATUS_COLOR, STATUS_LABEL } from '@/types'
 import { format, isPast, isToday } from 'date-fns'
@@ -38,16 +40,12 @@ function kpiColor(count: number, activeColor: string) {
 
 export default async function TasksPage({ searchParams }: { searchParams: { filter?: Filter } }) {
   const supabase = createServerSupabaseClient()
+  const headerStore = headers()
+  const forwardedUserId = headerStore.get('x-auth-user-id')
+  const isAdmin = headerStore.get('x-auth-user-role') === 'admin'
   const filter = searchParams.filter ?? 'active'
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user!.id)
-    .single()
-
-  const isAdmin = profile?.role === 'admin'
+  if (!forwardedUserId) redirect('/login')
 
   let query = supabase
     .from('tasks')
@@ -73,7 +71,7 @@ export default async function TasksPage({ searchParams }: { searchParams: { filt
     .order('end_date', { ascending: true })
     .limit(100)
 
-  if (!isAdmin) query = query.eq('assignee_id', user!.id)
+  if (!isAdmin) query = query.eq('assignee_id', forwardedUserId)
 
   const { data } = await query
 
