@@ -1,31 +1,25 @@
+import { headers } from 'next/headers'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import GanttChart from '@/components/GanttChart'
 import { measureServerStep, logServerSummary } from '@/lib/perf'
 
 export default async function GanttPage({ searchParams }: { searchParams: { project_id?: string } }) {
   const supabase = createServerSupabaseClient()
+  const headerStore = headers()
   const pageStartedAt = Date.now()
+  const isAdmin = headerStore.get('x-auth-user-role') === 'admin'
 
-  const [projectsResult, authResult] = await Promise.all([
-    measureServerStep('gantt:projects', () =>
-      supabase
-        .from('projects')
-        .select('id, name')
-        .eq('status', 'in_progress')
-        .is('deleted_at', null)
-        .order('name'),
-    ),
-    measureServerStep('gantt:auth-user', () => supabase.auth.getUser()),
-  ])
+  const projectsResult = await measureServerStep('gantt:projects', () =>
+    supabase
+      .from('projects')
+      .select('id, name')
+      .eq('status', 'in_progress')
+      .is('deleted_at', null)
+      .order('name'),
+  )
 
   const projects = projectsResult.data
   const selectedId = searchParams.project_id ?? projects?.[0]?.id?.toString()
-  const user = authResult.data.user
-
-  const profileResult = await measureServerStep('gantt:profile', () =>
-    supabase.from('users').select('role').eq('id', user!.id).single(),
-  )
-  const isAdmin = profileResult.data?.role === 'admin'
 
   let tasks: any[] = []
   if (selectedId) {
