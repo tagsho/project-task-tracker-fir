@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { STATUS_LABEL } from '@/types'
 import type { ProjectStatus } from '@/types'
@@ -16,23 +17,15 @@ function autoProgress(phases: any[]): number {
 
 export default async function ProjectsPage() {
   const supabase = createServerSupabaseClient()
+  const headerStore = headers()
+  const isAdmin = headerStore.get('x-auth-user-role') === 'admin'
 
-  const [{ data: projects }, { data: { user } }] = await Promise.all([
-    supabase
-      .from('projects')
-      .select('id, name, status, start_date, end_date, owner:users(name), phases(tasks(status))')
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(50),
-    supabase.auth.getUser(),
-  ])
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user!.id)
-    .single()
-  const isAdmin = profile?.role === 'admin'
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('id, name, status, start_date, end_date, owner:users(name), phases(tasks(status))')
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(50)
 
   return (
     <div className="p-6">
